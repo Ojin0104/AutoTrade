@@ -1,23 +1,21 @@
 package yj.AutoTrade.upbit;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
-import yj.AutoTrade.upbit.dto.UpbitAccountResponseDto;
-import yj.AutoTrade.upbit.dto.UpbitTickerResponseDto;
+import yj.AutoTrade.upbit.dto.*;
+
+import java.io.UnsupportedEncodingException;
+import java.security.NoSuchAlgorithmException;
 
 import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
-@TestPropertySource(properties = {
-        "upbit.url=https://api.upbit.com",
-        "upbit.access-key=access",
-        "upbit.secret-key=secret"
-})
 class UpbitApiClientTest {
     @Autowired
     private UpbitApiClient upbitApiClient;
 
+    @DisplayName("Upbit API : 실시간 거래가 조회")
     @Test
     void testGetUpbitTicker() {
         // Given
@@ -32,6 +30,7 @@ class UpbitApiClientTest {
         System.out.println("Upbit API Response: " + response[0]);
     }
 
+    @DisplayName("Upbit API : 사용자 계좌 조회")
     @Test
     void testGetUpbitAccount() {
 
@@ -40,5 +39,22 @@ class UpbitApiClientTest {
         assertNotNull(upbitAccount);
 
         System.out.println("Upbit API Response: " + upbitAccount[0]);
+    }
+
+
+    @DisplayName("Upbit API : 주문 (정상 응답)")
+    @Test
+    void testCreateUpbitOrder() throws UnsupportedEncodingException, NoSuchAlgorithmException {
+
+        UpbitOrderRequestDto upbitOrderRequestDto = UpbitOrderRequestDto.builder()
+                .market("KRW-BTC")
+                .side("bid")
+                .price("5000")
+                .ordType("price")
+                .build();
+        UpbitOrderResponseDto orderResponse = upbitApiClient.createOrder(upbitOrderRequestDto);
+
+        assertNotNull(orderResponse);
+        System.out.println("Upbit API Response: " + orderResponse);
     }
 }
