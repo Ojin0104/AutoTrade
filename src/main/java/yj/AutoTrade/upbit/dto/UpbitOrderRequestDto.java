@@ -5,12 +5,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.util.StringJoiner;
-
 @Builder
 @Getter
 @JsonInclude(JsonInclude.Include.NON_NULL)  // null 값 필드는 JSON에서 제외
-public class UpbitOrderRequestDto implements UpbitRequestParamsDto {
+public class UpbitOrderRequestDto extends UpbitRequestParamsDto {
 
 
         private String market; // 마켓 ID (필수)
@@ -31,16 +29,5 @@ public class UpbitOrderRequestDto implements UpbitRequestParamsDto {
         @JsonProperty("time_in_force")
         private String timeInForce; // IOC, FOK 주문 설정 (best, limit에서만 사용 가능)
 
-        public String getQueryString() {
-                StringJoiner queryString = new StringJoiner("&");
 
-                if (market != null && !market.isEmpty()) queryString.add("market=" + market);
-                if (side != null && !side.isEmpty()) queryString.add("side=" + side);
-                if (volume != null && !volume.isEmpty()) queryString.add("volume=" + volume);
-                if (price != null && !price.isEmpty()) queryString.add("price=" + price);
-                if (ordType != null && !ordType.isEmpty()) queryString.add("ord_type=" + ordType);
-                if (identifier != null && !identifier.isEmpty()) queryString.add("identifier=" + identifier);
-                if (timeInForce != null && !timeInForce.isEmpty()) queryString.add("time_in_force=" + timeInForce);
-                return queryString.toString();
-        }
 }
