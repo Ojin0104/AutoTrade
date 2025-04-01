@@ -4,8 +4,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import yj.AutoTrade.upbit.UpbitApiClient;
-import yj.AutoTrade.upbit.dto.UpbitTickerResponseDto;
+import yj.AutoTrade.binance.dto.*;
+
+
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -31,4 +33,28 @@ public class BinanceApiClientTest {
         }
 
 
+    @DisplayName("Binance API : 주문 요청(limit)")
+    @Test
+    void limitOrder_shouldSucceed() throws Exception {
+        BinanceOrderRequestDto request = BinanceOrderRequestDto.builder()
+                .symbol("BTCUSDT")
+                .side(OrderSide.BUY)
+                .type(OrderType.LIMIT)
+                .timeInForce(TimeInForce.GTC)
+                .quantity(new BigDecimal("0.001"))
+                .price(new BigDecimal("20000.00"))
+                .newClientOrderId("test-limit-" + System.currentTimeMillis())
+                .newOrderRespType(NewOrderRespType.FULL)
+                .recvWindow(5000L)
+                .timestamp(System.currentTimeMillis())
+                .build();
+
+        BinanceOrderResponseDto response = binanceApiClient.createOrder(request);
+
+        assertNotNull(response);
+        System.out.println("LIMIT 주문 응답: " + response);
     }
+
+    }
+
+
