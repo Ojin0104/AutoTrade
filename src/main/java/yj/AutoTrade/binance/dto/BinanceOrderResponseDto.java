@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record OrderResponseDto(
+public record BinanceOrderResponseDto(
 
         // 공통 필드 (ACK, RESULT, FULL)
         String symbol,

@@ -3,14 +3,16 @@ package yj.AutoTrade.binance;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
-import yj.AutoTrade.binance.dto.OrderRequestDto;
+import reactor.core.publisher.Mono;
+import yj.AutoTrade.binance.dto.BinanceOrderRequestDto;
+import yj.AutoTrade.binance.dto.BinanceOrderResponseDto;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -49,13 +51,14 @@ public class BinanceApiClient {
         return true;
     }
 
-    public String createOrder(OrderRequestDto dto) throws Exception {
-        Map<String, Object> rawMap = objectMapper.convertValue(dto, new TypeReference<Map<String, Object>>() {});
 
+    public BinanceOrderResponseDto createOrder(BinanceOrderRequestDto dto) throws Exception {
+
+        Map<String, Object> rawMap = objectMapper.convertValue(dto, new TypeReference<Map<String, Object>>() {});
         Map<String, String> params = rawMap.entrySet().stream()
                 .filter(entry -> entry.getValue() != null)
                 .collect(Collectors.toMap(
-                        e -> e.getKey()
+                        Map.Entry::getKey
                         ,
                         entry -> entry.getValue() instanceof Enum<?> e ? e.name() : entry.getValue().toString(),
                         (a, b) -> b,
@@ -65,25 +68,23 @@ public class BinanceApiClient {
         params.put("timestamp", String.valueOf(System.currentTimeMillis()));
 
         String payload = params.entrySet().stream()
-                .map(e -> e.getKey() + "=" + e.getValue())
-                .reduce((a, b) -> a + "&" + b)
-                .orElse("");
+                .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .collect(Collectors.joining("&"));
 
         String signature = hmacSha256(payload, secretKey);
-        params.put("signature", signature);
-
-
-
-        MultiValueMap<String, String> multiValueParams = new LinkedMultiValueMap<>();
-        params.forEach(multiValueParams::add);
+        String finalPayload = payload + "&signature=" + signature;
 
         return webClient.post()
                 .uri("/api/v3/order")
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("X-MBX-APIKEY", apiKey)
-                .bodyValue(multiValueParams)  // ⬅️ 쿼리 문자열이 아닌 MultiValueMap 자체!
+                .bodyValue(finalPayload)
                 .retrieve()
-                .bodyToMono(String.class)
+                .onStatus(HttpStatusCode::isError, clientResponse ->
+                        clientResponse.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(new RuntimeException("Binance 주문 API 요청 실패: " + errorBody)))
+                )
+                .bodyToMono(BinanceOrderResponseDto.class)
                 .block();
     }
 

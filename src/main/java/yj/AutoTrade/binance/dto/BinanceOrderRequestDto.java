@@ -1,11 +1,19 @@
 package yj.AutoTrade.binance.dto;
 
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.*;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 
-public class OrderRequestDto {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@Builder
+@ToString
+@Getter
+public class BinanceOrderRequestDto {
 
     @NotBlank(message = "symbol은 필수입니다.")
     private String symbol;
