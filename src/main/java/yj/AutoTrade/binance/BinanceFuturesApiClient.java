@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import yj.AutoTrade.binance.dto.BinanceFuturesAccountResponseDto;
 import yj.AutoTrade.binance.dto.BinanceFuturesBalanceResponseDto;
+import yj.AutoTrade.binance.dto.BinancePriceResponseDto;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -82,6 +83,7 @@ public class BinanceFuturesApiClient {
                 .block();
     }
 
+
     public BinanceFuturesAccountResponseDto getFuturesAccount() throws Exception {
         // 1. 요청 파라미터 구성
         Map<String, String> params = new LinkedHashMap<>();
@@ -111,6 +113,43 @@ public class BinanceFuturesApiClient {
                 .bodyToMono(new ParameterizedTypeReference<BinanceFuturesAccountResponseDto>() {})
                 .block();
     }
+
+
+    public BinancePriceResponseDto getPrice(String symbol){
+        Map<String, String> params = new LinkedHashMap<>();
+
+        params.put("symbol", symbol);
+
+        String queryString = params.entrySet().stream()
+                .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .collect(Collectors.joining("&"));
+
+        return webClient.get()
+                .uri("/fapi/v1/premiumIndex?" + queryString)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class).flatMap(errorBody ->
+                                Mono.error(new RuntimeException("잔고 조회 실패: " + errorBody)))
+                )
+                .bodyToMono(new ParameterizedTypeReference<BinancePriceResponseDto>() {})
+                .block();
+
+    }
+
+    public List<BinancePriceResponseDto> getTotalPrice(){
+
+        return webClient.get()
+                .uri("/fapi/v1/premiumIndex")
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class).flatMap(errorBody ->
+                                Mono.error(new RuntimeException("잔고 조회 실패: " + errorBody)))
+                )
+                .bodyToMono(new ParameterizedTypeReference<List<BinancePriceResponseDto>>() {})
+                .block();
+
+    }
+
 
     private String hmacSha256(String data, String key) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
