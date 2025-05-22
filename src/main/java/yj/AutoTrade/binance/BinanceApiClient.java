@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import yj.AutoTrade.binance.dto.BinanceOrderRequestDto;
 import yj.AutoTrade.binance.dto.BinanceOrderResponseDto;
+import yj.AutoTrade.binance.dto.BinanceTickerPriceDto;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -102,6 +103,40 @@ public class BinanceApiClient {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();
+    }
+
+    /**
+     * 단일 심볼의 현재가 조회
+     */
+    public BinanceTickerPriceDto getTickerPrice(String symbol) {
+        return webClient.get()
+                .uri("/api/v3/ticker/price?symbol=" + symbol)
+                .retrieve()
+                .bodyToMono(BinanceTickerPriceDto.class)
+                .block();
+    }
+
+    /**
+     * 여러 심볼의 현재가 조회
+     */
+    public BinanceTickerPriceDto[] getTickerPrices(String[] symbols) {
+        String symbolsParam = String.join(",", symbols);
+        return webClient.get()
+                .uri("/api/v3/ticker/price?symbols=[" + symbolsParam + "]")
+                .retrieve()
+                .bodyToMono(BinanceTickerPriceDto[].class)
+                .block();
+    }
+
+    /**
+     * 모든 심볼의 현재가 조회
+     */
+    public BinanceTickerPriceDto[] getAllTickerPrices() {
+        return webClient.get()
+                .uri("/api/v3/ticker/price")
+                .retrieve()
+                .bodyToMono(BinanceTickerPriceDto[].class)
+                .block();
     }
 
 }
