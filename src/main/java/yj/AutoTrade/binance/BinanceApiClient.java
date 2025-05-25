@@ -4,12 +4,16 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.BodyInserters;
 import reactor.core.publisher.Mono;
 import yj.AutoTrade.binance.dto.BinanceOrderRequestDto;
 import yj.AutoTrade.binance.dto.BinanceOrderResponseDto;
 import yj.AutoTrade.binance.dto.BinanceTickerPriceDto;
+import yj.AutoTrade.binance.dto.BinanceChangeLeverageRequestDto;
+import yj.AutoTrade.binance.dto.BinanceChangeLeverageResponseDto;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -53,9 +57,9 @@ public class BinanceApiClient {
     }
 
 
-    public BinanceOrderResponseDto createOrder(BinanceOrderRequestDto dto) throws Exception {
+    public BinanceOrderResponseDto createOrder(BinanceOrderRequestDto requestDto) throws Exception {
 
-        Map<String, Object> rawMap = objectMapper.convertValue(dto, new TypeReference<Map<String, Object>>() {});
+        Map<String, Object> rawMap = objectMapper.convertValue(requestDto, new TypeReference<Map<String, Object>>() {});
         Map<String, String> params = rawMap.entrySet().stream()
                 .filter(entry -> entry.getValue() != null)
                 .collect(Collectors.toMap(
@@ -87,6 +91,28 @@ public class BinanceApiClient {
                 )
                 .bodyToMono(BinanceOrderResponseDto.class)
                 .block();
+    }
+
+    public String buildSignedPayload(Object requestDto) throws Exception {
+        Map<String, Object> rawMap = objectMapper.convertValue(requestDto, new TypeReference<>() {});
+        
+        Map<String, String> params = rawMap.entrySet().stream()
+                .filter(entry -> entry.getValue() != null)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue() instanceof Enum<?> e ? e.name() : entry.getValue().toString(),
+                        (a, b) -> b,
+                        LinkedHashMap::new
+                ));
+
+        params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+
+        String payload = params.entrySet().stream()
+                .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .collect(Collectors.joining("&"));
+
+        String signature = hmacSha256(payload, secretKey);
+        return payload + "&signature=" + signature;
     }
 
     private String hmacSha256(String data, String key) throws Exception {
