@@ -3,11 +3,15 @@ package yj.AutoTrade.upbit.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString
 public class UpbitTickerResponseDto {
 
     private String market; // 종목 구분 코드
