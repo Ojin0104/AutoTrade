@@ -1,6 +1,9 @@
 package yj.AutoTrade.upbit;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -16,7 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
-
+@Slf4j
 @Component
 public class UpbitApiClient {
     private final WebClient webClient;
@@ -46,7 +49,7 @@ public class UpbitApiClient {
         return "Bearer " + jwtToken;
     }
 
-    private String generateOrderAuthenticationToken(UpbitRequestParamsDto upbitRequestParamsDto) throws NoSuchAlgorithmException, UnsupportedEncodingException {
+    private String generateOrderAuthenticationToken(UpbitRequestParamsDto upbitRequestParamsDto) throws NoSuchAlgorithmException {
 
         ArrayList<String> queryElements = new ArrayList<>();
         for(Map.Entry<String, String> entity : upbitRequestParamsDto.toHashMap().entrySet()) {
@@ -89,7 +92,9 @@ public class UpbitApiClient {
                 .block();  // 동기 요청
     }
 
-    public UpbitOrderResponseDto createOrder(UpbitOrderRequestDto upbitOrderRequestDto) throws UnsupportedEncodingException, NoSuchAlgorithmException {
+    @Retry(name = "externalApi")
+    @CircuitBreaker(name = "upbitApi", fallbackMethod = "fallback")
+    public UpbitOrderResponseDto createOrder(UpbitOrderRequestDto upbitOrderRequestDto) throws  NoSuchAlgorithmException {
 
        //body 전송형식 변경 필요
         return webClient.post()
@@ -98,10 +103,19 @@ public class UpbitApiClient {
                 .header("Content-Type", "application/json")
                 .bodyValue(upbitOrderRequestDto.toHashMap()).retrieve()
                 .onStatus(HttpStatusCode::isError, clientResponse ->
-                        clientResponse.bodyToMono(String.class)
-                                .flatMap(errorBody -> Mono.error(new RuntimeException("Upbit 주문 API 요청 실패: " + errorBody)))
+                        clientResponse.bodyToMono(UpbitErrorResponse.class)
+                                .flatMap(error -> {
+                                    String errorCode = error.getError().getName();       // 예: "invalid_order"
+                                    String errorMessage = error.getError().getMessage(); // 예: "주문 수량이 부족합니다."
+                                    return Mono.error(new UpbitException(errorCode, errorMessage));
+                                })
                 )
                 .bodyToMono(UpbitOrderResponseDto.class)
                 .block();  // 동기 요청
+    }
+
+    private <T> T fallback(Object request, Throwable t) {
+        log.error("[CircuitBreaker Fallback] BinanceFuturesApiClient: " + t.getMessage());
+        throw new RuntimeException("BinanceFuturesApiClient fallback: " + t.getMessage(), t);
     }
 }
