@@ -1,17 +1,16 @@
 package yj.AutoTrade.binance;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import io.github.resilience4j.retry.annotation.Retry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.reactive.function.client.WebClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Mono;
-import yj.AutoTrade.binance.dto.BinanceFuturesOrderRequestDto;
-import yj.AutoTrade.binance.dto.BinanceFuturesOrderResponseDto;
-import yj.AutoTrade.binance.dto.BinanceChangeLeverageRequestDto;
-import yj.AutoTrade.binance.dto.BinanceChangeLeverageResponseDto;
-
+import yj.AutoTrade.binance.dto.*;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.net.URLEncoder;
@@ -20,7 +19,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.LinkedHashMap;
 
-
+@Slf4j
 @Component
 public class BinanceFuturesApiClient {
     private final WebClient webClient;
@@ -39,7 +38,8 @@ public class BinanceFuturesApiClient {
         this.webClient = webClientBuilder.baseUrl(url).build();
     }
 
-
+    @Retry(name = "externalApi")
+    @CircuitBreaker(name = "binanceFuturesApi", fallbackMethod = "fallback")
     public BinanceFuturesOrderResponseDto createOrder(BinanceFuturesOrderRequestDto requestDto) throws Exception {
 
         String finalPayload = buildSignedPayload(requestDto);
@@ -51,13 +51,18 @@ public class BinanceFuturesApiClient {
                 .bodyValue(finalPayload)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, clientResponse ->
-                        clientResponse.bodyToMono(String.class)
-                                .flatMap(errorBody -> Mono.error(new RuntimeException("Binance 선물 주문 API 요청 실패: " + errorBody)))
+                        clientResponse.bodyToMono(BinanceErrorResponse.class)
+                                .flatMap(error -> {
+                                    String code = String.valueOf(error.getCode());
+                                    String msg = error.getMsg();
+                                    return Mono.error(new BinanceException(code, msg));
+                                })
                 )
                 .bodyToMono(BinanceFuturesOrderResponseDto.class)
                 .block();
     }
 
+    @CircuitBreaker(name = "binanceFuturesApi", fallbackMethod = "fallback")
     public BinanceChangeLeverageResponseDto changeLeverage(BinanceChangeLeverageRequestDto requestDto) throws Exception  {
         
         String finalPayload = buildSignedPayload(requestDto);
@@ -115,4 +120,9 @@ public class BinanceFuturesApiClient {
         return sb.toString();
     }
     
+
+    private <T> T fallback(Object request, Throwable t) {
+        log.error("[CircuitBreaker Fallback] BinanceFuturesApiClient: " + t.getMessage());
+        throw new RuntimeException("BinanceFuturesApiClient fallback: " + t.getMessage(), t);
+    }
 }

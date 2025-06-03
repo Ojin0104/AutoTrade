@@ -9,11 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.BodyInserters;
 import reactor.core.publisher.Mono;
-import yj.AutoTrade.binance.dto.BinanceOrderRequestDto;
-import yj.AutoTrade.binance.dto.BinanceOrderResponseDto;
-import yj.AutoTrade.binance.dto.BinanceTickerPriceDto;
-import yj.AutoTrade.binance.dto.BinanceChangeLeverageRequestDto;
-import yj.AutoTrade.binance.dto.BinanceChangeLeverageResponseDto;
+import yj.AutoTrade.binance.dto.*;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -86,8 +82,12 @@ public class BinanceApiClient {
                 .bodyValue(finalPayload)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, clientResponse ->
-                        clientResponse.bodyToMono(String.class)
-                                .flatMap(errorBody -> Mono.error(new RuntimeException("Binance 주문 API 요청 실패: " + errorBody)))
+                        clientResponse.bodyToMono(BinanceErrorResponse.class)
+                                .flatMap(error -> {
+                                    String code = String.valueOf(error.getCode());
+                                    String msg = error.getMsg();
+                                    return Mono.error(new BinanceException(code, msg));
+                                })
                 )
                 .bodyToMono(BinanceOrderResponseDto.class)
                 .block();
