@@ -1,22 +1,65 @@
 package yj.AutoTrade.binance;
 
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import yj.AutoTrade.binance.dto.BinanceFuturesAccountResponseDto;
-import yj.AutoTrade.binance.dto.BinanceFuturesBalanceResponseDto;
-import yj.AutoTrade.binance.dto.BinancePriceResponseDto;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import java.math.BigDecimal;
+import yj.AutoTrade.binance.dto.BinanceFuturesOrderRequestDto;
+import yj.AutoTrade.binance.dto.BinanceFuturesOrderResponseDto;
+import yj.AutoTrade.binance.dto.BinanceChangeLeverageRequestDto;
+import yj.AutoTrade.binance.dto.BinanceChangeLeverageResponseDto;
+import yj.AutoTrade.binance.dto.OrderSide;
+import yj.AutoTrade.binance.dto.OrderType;
+import yj.AutoTrade.binance.dto.TimeInForce;
+import yj.AutoTrade.binance.dto.NewOrderRespType;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 
 @SpringBootTest
 public class BinanceFuturesApiClientTest {
     @Autowired
     private BinanceFuturesApiClient binanceFuturesApiClient;
 
+  
+    @DisplayName("Binance API : 주문 요청(limit)")
+    @Test
+    void MarketOrder_shouldSucceed() throws Exception {
+        BinanceFuturesOrderRequestDto request = BinanceFuturesOrderRequestDto.builder()
+                .symbol("BTCUSDT")
+                .side(OrderSide.BUY)
+                .type(OrderType.MARKET)
+                .quantity("0.001")
+                .newClientOrderId("test-limit-" + System.currentTimeMillis())
+                .newOrderRespType(NewOrderRespType.FULL)
+                .recvWindow(5000L)
+                .timestamp(System.currentTimeMillis())
+                .build();
+
+        BinanceFuturesOrderResponseDto response = binanceFuturesApiClient.createOrder(request);
+
+        assertNotNull(response);
+        System.out.println("LIMIT 주문 응답: " + response);
+    }
+
+    @DisplayName("Binance API : 레버리지 변경 요청")
+    @Test
+    void changeLeverage_shouldSucceed() throws Exception {
+        BinanceChangeLeverageRequestDto request = BinanceChangeLeverageRequestDto.builder()
+                .symbol("BTCUSDT")
+                .leverage(10)
+                .recvWindow(5000L)
+                .timestamp(System.currentTimeMillis())
+                .build();
+
+        BinanceChangeLeverageResponseDto response = binanceFuturesApiClient.changeLeverage(request);
+
+        assertNotNull(response);
+        System.out.println("레버리지 변경 응답: " + response);
 
     @DisplayName("Binance Futures API : Balance 조회")
     @Test

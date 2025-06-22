@@ -1,24 +1,28 @@
 package yj.AutoTrade.binance;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import io.github.resilience4j.retry.annotation.Retry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.reactive.function.client.WebClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Mono;
-import yj.AutoTrade.binance.dto.BinanceFuturesAccountResponseDto;
-import yj.AutoTrade.binance.dto.BinanceFuturesBalanceResponseDto;
-import yj.AutoTrade.binance.dto.BinancePriceResponseDto;
+import yj.AutoTrade.binance.dto.*;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.List;
+
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
+
+@Slf4j
 
 @Component
 public class BinanceFuturesApiClient {
@@ -38,118 +42,72 @@ public class BinanceFuturesApiClient {
         this.webClient = webClientBuilder.baseUrl(url).build();
     }
 
+    @Retry(name = "externalApi")
+    @CircuitBreaker(name = "binanceFuturesApi", fallbackMethod = "fallback")
+    public BinanceFuturesOrderResponseDto createOrder(BinanceFuturesOrderRequestDto requestDto) throws Exception {
 
-    public boolean checkPing(){
-        try {
-            webClient.get()
-                    .uri("/fapi/v3/ping")
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();  // 동기 요청
-        }catch(Exception e){
-            return false;
-        }
-        return true;
-    }
+        String finalPayload = buildSignedPayload(requestDto);
 
-
-    public List<BinanceFuturesBalanceResponseDto> getFuturesBalance() throws Exception {
-        // 1. 요청 파라미터 구성
-        Map<String, String> params = new LinkedHashMap<>();
-        params.put("timestamp", String.valueOf(System.currentTimeMillis()));
-        params.put("recvWindow", "5000");
-
-        // 2. 쿼리 문자열 생성
-        String queryString = params.entrySet().stream()
-                .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
-                .collect(Collectors.joining("&"));
-
-        // 3. 서명 생성
-        String signature = hmacSha256(queryString, secretKey);
-
-        // 4. 최종 쿼리 스트링
-        String finalQuery = queryString + "&signature=" + signature;
-
-        // 5. 요청 전송
-        return webClient.get()
-                .uri("/fapi/v3/balance?" + finalQuery)
+        return webClient.post()
+                .uri("/fapi/v1/order")
+                .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("X-MBX-APIKEY", apiKey)
+                .bodyValue(finalPayload)
                 .retrieve()
-                .onStatus(HttpStatusCode::isError, response ->
-                        response.bodyToMono(String.class).flatMap(errorBody ->
-                                Mono.error(new RuntimeException("잔고 조회 실패: " + errorBody)))
+                .onStatus(HttpStatusCode::isError, clientResponse ->
+                        clientResponse.bodyToMono(BinanceErrorResponse.class)
+                                .flatMap(error -> {
+                                    String code = String.valueOf(error.getCode());
+                                    String msg = error.getMsg();
+                                    return Mono.error(new BinanceException(code, msg));
+                                })
                 )
-                .bodyToMono(new ParameterizedTypeReference<List<BinanceFuturesBalanceResponseDto>>() {})
+                .bodyToMono(BinanceFuturesOrderResponseDto.class)
                 .block();
     }
 
+    @CircuitBreaker(name = "binanceFuturesApi", fallbackMethod = "fallback")
+    public BinanceChangeLeverageResponseDto changeLeverage(BinanceChangeLeverageRequestDto requestDto) throws Exception  {
+        
+        String finalPayload = buildSignedPayload(requestDto);
 
-    public BinanceFuturesAccountResponseDto getFuturesAccount() throws Exception {
-        // 1. 요청 파라미터 구성
-        Map<String, String> params = new LinkedHashMap<>();
-        params.put("timestamp", String.valueOf(System.currentTimeMillis()));
-        params.put("recvWindow", "5000");
-
-        // 2. 쿼리 문자열 생성
-        String queryString = params.entrySet().stream()
-                .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
-                .collect(Collectors.joining("&"));
-
-        // 3. 서명 생성
-        String signature = hmacSha256(queryString, secretKey);
-
-        // 4. 최종 쿼리 스트링
-        String finalQuery = queryString + "&signature=" + signature;
-
-        // 5. 요청 전송
-        return webClient.get()
-                .uri("/fapi/v3/account?" + finalQuery)
+        return webClient.post()
+                .uri("/fapi/v1/leverage")
+                .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("X-MBX-APIKEY", apiKey)
+                .bodyValue(finalPayload)
                 .retrieve()
-                .onStatus(HttpStatusCode::isError, response ->
-                        response.bodyToMono(String.class).flatMap(errorBody ->
-                                Mono.error(new RuntimeException("잔고 조회 실패: " + errorBody)))
+                .onStatus(HttpStatusCode::isError, clientResponse ->
+                        clientResponse.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(new RuntimeException("Binance 선물 주문 레버리지 변경 실패: " + errorBody)))
                 )
-                .bodyToMono(new ParameterizedTypeReference<BinanceFuturesAccountResponseDto>() {})
+                .bodyToMono(BinanceChangeLeverageResponseDto.class)
+
                 .block();
     }
 
 
-    public BinancePriceResponseDto getPrice(String symbol){
-        Map<String, String> params = new LinkedHashMap<>();
+    public String buildSignedPayload(Object requestDto) throws Exception {
+        Map<String, Object> rawMap = objectMapper.convertValue(requestDto, new TypeReference<>() {});
+        
+        Map<String, String> params = rawMap.entrySet().stream()
+                .filter(entry -> entry.getValue() != null)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue() instanceof Enum<?> e ? e.name() : entry.getValue().toString(),
+                        (a, b) -> b,
+                        LinkedHashMap::new
+                ));
 
-        params.put("symbol", symbol);
+        params.put("timestamp", String.valueOf(System.currentTimeMillis()));
 
-        String queryString = params.entrySet().stream()
+        String payload = params.entrySet().stream()
                 .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
 
-        return webClient.get()
-                .uri("/fapi/v1/premiumIndex?" + queryString)
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, response ->
-                        response.bodyToMono(String.class).flatMap(errorBody ->
-                                Mono.error(new RuntimeException("잔고 조회 실패: " + errorBody)))
-                )
-                .bodyToMono(new ParameterizedTypeReference<BinancePriceResponseDto>() {})
-                .block();
-
+        String signature = hmacSha256(payload, secretKey);
+        return payload + "&signature=" + signature;
     }
-
-    public List<BinancePriceResponseDto> getTotalPrice(){
-
-        return webClient.get()
-                .uri("/fapi/v1/premiumIndex")
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, response ->
-                        response.bodyToMono(String.class).flatMap(errorBody ->
-                                Mono.error(new RuntimeException("잔고 조회 실패: " + errorBody)))
-                )
-                .bodyToMono(new ParameterizedTypeReference<List<BinancePriceResponseDto>>() {})
-                .block();
-
-    }
-
 
     private String hmacSha256(String data, String key) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
@@ -167,6 +125,8 @@ public class BinanceFuturesApiClient {
         return sb.toString();
     }
 
-
-
+    private <T> T fallback(Object request, Throwable t) {
+        log.error("[CircuitBreaker Fallback] BinanceFuturesApiClient: " + t.getMessage());
+        throw new RuntimeException("BinanceFuturesApiClient fallback: " + t.getMessage(), t);
+    }
 }
