@@ -1,5 +1,6 @@
 package yj.AutoTrade.binance;
 
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
@@ -11,15 +12,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Mono;
 import yj.AutoTrade.binance.dto.*;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.LinkedHashMap;
 
 @Slf4j
+
 @Component
 public class BinanceFuturesApiClient {
     private final WebClient webClient;
@@ -78,6 +82,7 @@ public class BinanceFuturesApiClient {
                                 .flatMap(errorBody -> Mono.error(new RuntimeException("Binance 선물 주문 레버리지 변경 실패: " + errorBody)))
                 )
                 .bodyToMono(BinanceChangeLeverageResponseDto.class)
+
                 .block();
     }
 
@@ -119,7 +124,6 @@ public class BinanceFuturesApiClient {
         }
         return sb.toString();
     }
-    
 
     private <T> T fallback(Object request, Throwable t) {
         log.error("[CircuitBreaker Fallback] BinanceFuturesApiClient: " + t.getMessage());
