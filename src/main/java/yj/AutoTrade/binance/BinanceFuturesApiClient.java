@@ -125,7 +125,7 @@ public class BinanceFuturesApiClient {
         return sb.toString();
     }
 
-    private <T> T fallback(Object request, Throwable t) {
+    private void fallback(Object request, Throwable t) {
         log.error("[CircuitBreaker Fallback] BinanceFuturesApiClient: " + t.getMessage());
         throw new RuntimeException("BinanceFuturesApiClient fallback: " + t.getMessage(), t);
     }

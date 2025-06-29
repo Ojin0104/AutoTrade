@@ -1,7 +1,6 @@
 package yj.AutoTrade.binance.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -10,7 +9,7 @@ public record BinanceOrderResponseDto(
 
         // 공통 필드 (ACK, RESULT, FULL)
         String symbol,
-        Long orderId,
+        String orderId,
         Long orderListId,
         String clientOrderId,
         Long transactTime,

@@ -4,10 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.BodyInserters;
 import reactor.core.publisher.Mono;
 import yj.AutoTrade.binance.dto.*;
 
@@ -53,7 +51,7 @@ public class BinanceApiClient {
     }
 
 
-    public BinanceOrderResponseDto createOrder(BinanceOrderRequestDto requestDto) throws Exception {
+    public BinanceOrderResponseDto createOrder(BinanceOrderRequestDto requestDto) {
 
         Map<String, Object> rawMap = objectMapper.convertValue(requestDto, new TypeReference<Map<String, Object>>() {});
         Map<String, String> params = rawMap.entrySet().stream()
@@ -115,12 +113,16 @@ public class BinanceApiClient {
         return payload + "&signature=" + signature;
     }
 
-    private String hmacSha256(String data, String key) throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        mac.init(secretKeySpec);
-        byte[] rawHmac = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-        return bytesToHex(rawHmac);
+    private String hmacSha256(String data, String key)  {
+        try{
+            Mac mac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            mac.init(secretKeySpec);
+            byte[] rawHmac = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return bytesToHex(rawHmac);
+        } catch (Exception e) {
+            throw new BinanceException("wrong hashAlgorithm",e.getMessage());
+        }
     }
 
     private String bytesToHex(byte[] bytes) {
