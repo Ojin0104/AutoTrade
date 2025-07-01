@@ -1,10 +1,11 @@
 package yj.AutoTrade.trade.entity;
 
+
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 import yj.AutoTrade.common.BaseTimeEntity;
-
+import java.math.BigDecimal;
 @Entity
 @Getter
 @Setter
@@ -28,10 +29,10 @@ public class TradeCompensationQueue extends BaseTimeEntity{
 
     // 거래 수량
     @Column(nullable = false)
-    private String quantity;
+    private BigDecimal quantity;
 
     // 거래 가격 (선택적)
-    private String price;
+    private BigDecimal price;
 
     // 상태: PENDING, SUCCESS, FAILED
     @Enumerated(EnumType.STRING)

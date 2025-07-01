@@ -13,7 +13,6 @@ import yj.AutoTrade.upbit.dto.UpbitOrderRequestDto;
 import yj.AutoTrade.upbit.dto.UpbitOrderResponseDto;
 import yj.AutoTrade.upbit.dto.UpbitOrderType;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -67,8 +66,8 @@ public class TradeCompensationBatchService {
             // 매도 주문 생성
             UpbitOrderRequestDto sellOrderRequest = UpbitOrderRequestDto.builder()
                     .market(compensation.getSymbol())
-                    .volume(new BigDecimal(compensation.getQuantity()))
-                    .price(new BigDecimal(compensation.getPrice()))
+                    .volume(compensation.getQuantity())
+                    .price(compensation.getPrice())
                     .ordType(UpbitOrderType.LIMIT)
                     .side("ask") // 매도
                     .build();
