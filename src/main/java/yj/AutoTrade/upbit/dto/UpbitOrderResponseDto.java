@@ -2,7 +2,7 @@ package yj.AutoTrade.upbit.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
-
+import java.math.BigDecimal;
 @Getter
 public class UpbitOrderResponseDto {
 
@@ -10,11 +10,11 @@ public class UpbitOrderResponseDto {
         private String uuid; // 주문의 고유 아이디
         private String side; // 주문 종류
         private String ordType; // 주문 방식
-        private String price; // 주문 당시 화폐 가격 (NumberString)
+        private BigDecimal price; // 주문 당시 화폐 가격 (NumberString)
         private String state; // 주문 상태
         private String market; // 마켓의 유일키
         private String createdAt; // 주문 생성 시간
-        private String volume; // 사용자가 입력한 주문 양 (NumberString)
+        private BigDecimal volume; // 사용자가 입력한 주문 양 (NumberString)
 
         @JsonProperty("remaining_volume")
         private String remainingVolume; // 체결 후 남은 주문 양 (NumberString)

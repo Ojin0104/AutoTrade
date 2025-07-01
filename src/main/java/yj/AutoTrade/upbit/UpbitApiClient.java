@@ -11,7 +11,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import yj.AutoTrade.upbit.dto.*;
 
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -49,28 +48,31 @@ public class UpbitApiClient {
         return "Bearer " + jwtToken;
     }
 
-    private String generateOrderAuthenticationToken(UpbitRequestParamsDto upbitRequestParamsDto) throws NoSuchAlgorithmException {
+    private String generateOrderAuthenticationToken(UpbitRequestParamsDto upbitRequestParamsDto) {
+        try{
+            ArrayList<String> queryElements = new ArrayList<>();
+            for(Map.Entry<String, String> entity : upbitRequestParamsDto.toHashMap().entrySet()) {
+                queryElements.add(entity.getKey() + "=" + entity.getValue());
+            }
+            String queryString = String.join("&", queryElements.toArray(new String[0]));
 
-        ArrayList<String> queryElements = new ArrayList<>();
-        for(Map.Entry<String, String> entity : upbitRequestParamsDto.toHashMap().entrySet()) {
-            queryElements.add(entity.getKey() + "=" + entity.getValue());
+            MessageDigest md = MessageDigest.getInstance("SHA-512");
+            md.update(queryString.getBytes(StandardCharsets.UTF_8));
+
+            String queryHash = String.format("%0128x", new BigInteger(1, md.digest()));
+
+            Algorithm algorithm = Algorithm.HMAC256(secretKey);
+            String jwtToken = JWT.create()
+                    .withClaim("access_key", accessKey)
+                    .withClaim("nonce", UUID.randomUUID().toString())
+                    .withClaim("query_hash", queryHash)
+                    .withClaim("query_hash_alg", "SHA512")
+                    .sign(algorithm);
+
+            return "Bearer " + jwtToken;
+        }catch(NoSuchAlgorithmException e){
+            throw new UpbitException("wrong hashAlgorithm",e.getMessage());
         }
-        String queryString = String.join("&", queryElements.toArray(new String[0]));
-
-        MessageDigest md = MessageDigest.getInstance("SHA-512");
-        md.update(queryString.getBytes(StandardCharsets.UTF_8));
-
-        String queryHash = String.format("%0128x", new BigInteger(1, md.digest()));
-
-        Algorithm algorithm = Algorithm.HMAC256(secretKey);
-        String jwtToken = JWT.create()
-                .withClaim("access_key", accessKey)
-                .withClaim("nonce", UUID.randomUUID().toString())
-                .withClaim("query_hash", queryHash)
-                .withClaim("query_hash_alg", "SHA512")
-                .sign(algorithm);
-
-        return "Bearer " + jwtToken;
     }
 
     public UpbitTickerResponseDto[] getUpbitTicker(String markets) {
@@ -94,7 +96,7 @@ public class UpbitApiClient {
 
     @Retry(name = "externalApi")
     @CircuitBreaker(name = "upbitApi", fallbackMethod = "fallback")
-    public UpbitOrderResponseDto createOrder(UpbitOrderRequestDto upbitOrderRequestDto) throws  NoSuchAlgorithmException {
+    public UpbitOrderResponseDto createOrder(UpbitOrderRequestDto upbitOrderRequestDto)  {
 
        //body 전송형식 변경 필요
         return webClient.post()

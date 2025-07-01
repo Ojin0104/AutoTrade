@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import yj.AutoTrade.upbit.dto.*;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.security.NoSuchAlgorithmException;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,8 +27,6 @@ class UpbitApiClientTest {
 
         // Then
         assertNotNull(response);
-        //assertTrue(response.contains("KRW-BTC"));
-        System.out.println("Upbit API Response: " + response[0]);
     }
 
     @DisplayName("Upbit API : 사용자 계좌 조회")
@@ -37,8 +36,6 @@ class UpbitApiClientTest {
         UpbitAccountResponseDto[] upbitAccount = upbitApiClient.getUpbitAccount();
 
         assertNotNull(upbitAccount);
-
-        System.out.println("Upbit API Response: " + upbitAccount[0]);
     }
 
 
@@ -49,12 +46,11 @@ class UpbitApiClientTest {
         UpbitOrderRequestDto upbitOrderRequestDto = UpbitOrderRequestDto.builder()
                 .market("KRW-BTC")
                 .side("bid")
-                .price("5000")
-                .ordType("price")
+                .price(new BigDecimal("5000"))
+                .ordType(UpbitOrderType.PRICE)
                 .build();
         UpbitOrderResponseDto orderResponse = upbitApiClient.createOrder(upbitOrderRequestDto);
 
         assertNotNull(orderResponse);
-        System.out.println("Upbit API Response: " + orderResponse);
     }
 }
