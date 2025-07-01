@@ -41,6 +41,7 @@ dependencies {
 	// Replace the following with the starter dependencies of specific modules you wish to use
 	implementation 'org.springframework.ai:spring-ai-openai'
 	implementation 'org.springframework.ai:spring-ai-starter-mcp-server'
+	implementation 'org.springframework.ai:spring-ai-starter-mcp-tool-callback'
 
 	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'

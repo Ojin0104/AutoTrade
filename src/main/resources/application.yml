@@ -8,8 +8,7 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
-  main:
-    banner-mode: off
+
   ai:
     mcp:
       server:
@@ -18,9 +17,6 @@ spring:
         type: SYNC
         sse-message-endpoint: /mcp/messages
 
-logging:
-  pattern:
-    console:
 
 springdoc:
   swagger-ui:
