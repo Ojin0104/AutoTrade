@@ -19,6 +19,7 @@ import yj.AutoTrade.upbit.dto.UpbitOrderResponseDto;
 import yj.AutoTrade.upbit.dto.UpbitOrderType;
 
 import java.math.BigDecimal;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -31,68 +32,244 @@ public class TradeService {
     private final TradeCompensationQueueService tradeCompensationQueueService;
 
     public void trade(TradeRequestDto tradeRequestDto) {
-        UpbitOrderResponseDto upbitOrderResponse = null;
         try {
-            // 1. Upbit 시장가 매수
-            UpbitOrderRequestDto upbitOrderRequest = UpbitOrderRequestDto.builder()
-                    .market(tradeRequestDto.getUpbitSymbol())
-                    .price(tradeRequestDto.getPrice())
-                    .ordType(UpbitOrderType.MARKET)
-                    .side("bid")
-                    .build();
-            upbitOrderResponse = upbitApiClient.createOrder(upbitOrderRequest);
-            log.info("Upbit 매수 주문 성공: {}", upbitOrderResponse.getUuid());
+            // 1. 잔고 및 가격 확인 (실패시 예외 발생)
+            validateBalanceAndPrice(tradeRequestDto);
 
-            // 2. Binance 선물 레버리지 설정
+            // 2. 현재 가격 조회로 수량 계산
+            BigDecimal upbitPrice = getCurrentUpbitPrice(tradeRequestDto.getUpbitSymbol());
+            BigDecimal binancePrice = getCurrentBinancePrice(tradeRequestDto.getBinanceSymbol());
+            
+            // 3. 금액 기준 수량 계산
+            BigDecimal tradeAmount = tradeRequestDto.getPrice(); // KRW 금액
+            BigDecimal leverage = tradeRequestDto.getLeverage();
+            
+            // 업비트 주문 수량 (KRW 금액 / 현재 가격)
+            BigDecimal upbitQuantity = tradeAmount.divide(upbitPrice, 8, java.math.RoundingMode.DOWN);
+            
+            // 바이낸스 주문 수량 (KRW를 USD로 환산 후 레버리지 적용)
+            BigDecimal usdtKrwRate = getCurrentUsdtKrwRate(); // 업비트 USDT 가격으로 환율 조회
+            BigDecimal usdAmount = tradeAmount.divide(usdtKrwRate, 2, java.math.RoundingMode.DOWN);
+            BigDecimal binanceQuantity = usdAmount.multiply(leverage).divide(binancePrice, 8, java.math.RoundingMode.DOWN);
+
+            // 4. 레버리지 설정
             binanceFuturesApiClient.changeLeverage(
                 BinanceChangeLeverageRequestDto.builder()
                     .symbol(tradeRequestDto.getBinanceSymbol())
-                    .leverage(tradeRequestDto.getLeverage().intValue())
+                    .leverage(leverage.intValue())
                     .build()
             );
 
-            // 3. 배율에 따라 수량 조절 (업비트 체결 수량 * 레버리지)
-            BigDecimal upbitVolume = upbitOrderResponse.getVolume();
-            BigDecimal leverage = tradeRequestDto.getLeverage();
-            BigDecimal futuresQuantity = upbitVolume.multiply(leverage);
+            // 5. 동시 주문 실행
+            UpbitOrderRequestDto upbitOrderRequest = UpbitOrderRequestDto.builder()
+                    .market(tradeRequestDto.getUpbitSymbol())
+                    .price(tradeAmount)
+                    .ordType(UpbitOrderType.MARKET)
+                    .side("bid")
+                    .build();
 
-            // 바이낸스 최소 주문 단위(예: 0.001 등) 반올림 필요시 아래 코드 사용
-            // futuresQuantity = futuresQuantity.setScale(3, RoundingMode.DOWN);
-
-            // 4. Binance 선물 숏 포지션 주문
-            BinanceFuturesOrderRequestDto binanceFuturesOrderRequest = BinanceFuturesOrderRequestDto.builder()
+            BinanceFuturesOrderRequestDto binanceOrderRequest = BinanceFuturesOrderRequestDto.builder()
                     .symbol(tradeRequestDto.getBinanceSymbol())
                     .side(OrderSide.SELL)
                     .type(OrderType.MARKET)
-                    .quantity(futuresQuantity.toPlainString())
+                    .quantity(binanceQuantity.toPlainString())
                     .newClientOrderId("short-" + System.currentTimeMillis())
                     .newOrderRespType(NewOrderRespType.FULL)
                     .recvWindow(5000L)
                     .timestamp(System.currentTimeMillis())
                     .build();
-            BinanceFuturesOrderResponseDto binanceOrderResponse = binanceFuturesApiClient.createOrder(binanceFuturesOrderRequest);
-            log.info("Binance 선물 숏 주문 성공: {}", binanceOrderResponse.getOrderId());
 
-            // 5. 주문 저장
-            orderService.saveSuccessfulOrder(tradeRequestDto, upbitOrderResponse, binanceOrderResponse);
-            log.info("신규 포지션 저장 성공");
+            // 6. 진짜 동시 주문 실행
+            CompletableFuture<UpbitOrderResponseDto> upbitFuture = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return upbitApiClient.createOrder(upbitOrderRequest);
+                } catch (UpbitException e) {
+                    log.error("Upbit 주문 실패: {}", e.getMessage());
+                    return null;
+                } catch (Exception e) {
+                    log.error("Upbit 주문 중 예외 발생: {}", e.getMessage());
+                    return null;
+                }
+            });
 
-        } catch (UpbitException e) {
-            log.error("Upbit 주문 실패: {}", e.getMessage());
-            orderService.saveFailedOrder(tradeRequestDto, null);
+            CompletableFuture<BinanceFuturesOrderResponseDto> binanceFuture = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return binanceFuturesApiClient.createOrder(binanceOrderRequest);
+                } catch (BinanceException e) {
+                    log.error("Binance 주문 실패: {}", e.getMessage());
+                    return null;
+                } catch (Exception e) {
+                    log.error("Binance 주문 중 예외 발생: {}", e.getMessage());
+                    return null;
+                }
+            });
 
-        } catch (BinanceException e) {
-            log.error("Binance 주문 실패: {}", e.getMessage());
-            if (upbitOrderResponse != null) {
-                orderService.saveFailedOrder(tradeRequestDto, upbitOrderResponse);
+            // 7. 주문 결과 대기
+            UpbitOrderResponseDto upbitOrderResponse = upbitFuture.get();
+            BinanceFuturesOrderResponseDto binanceOrderResponse = binanceFuture.get();
+
+            // 8. 결과 처리
+            if (upbitOrderResponse == null && binanceOrderResponse == null) {
+                log.error("업비트, 바이낸스 모두 주문 실패");
+                saveFailedOrderResult(tradeRequestDto, null);
+                
+            } else if (upbitOrderResponse == null) {
+                log.error("Upbit 주문 실패, Binance 주문 성공 - 바이낸스 포지션 정리 필요");
+                saveFailedOrderResult(tradeRequestDto, null);
+                attemptBinancePositionClose(tradeRequestDto.getBinanceSymbol(), binanceOrderResponse);
+                
+            } else if (binanceOrderResponse == null) {
+                log.error("Binance 주문 실패, 보상 매도 시도");
+                saveFailedOrderResult(tradeRequestDto, upbitOrderResponse);
                 attemptCompensation(upbitOrderResponse);
+                
+            } else {
+                log.info("Upbit 매수 주문 성공: {}", upbitOrderResponse.getUuid());
+                log.info("Binance 선물 숏 주문 성공: {}", binanceOrderResponse.getOrderId());
+                saveOrderResult(tradeRequestDto, upbitOrderResponse, binanceOrderResponse);
             }
+
+        } catch (InterruptedException e) {
+            log.error("주문 실행 중 인터럽트 발생: {}", e.getMessage());
+            Thread.currentThread().interrupt();
+            saveFailedOrderResult(tradeRequestDto, null);
+        } catch (BinanceException e) {
+            log.error("레버리지 설정 실패: {}", e.getMessage());
+            saveFailedOrderResult(tradeRequestDto, null);
         } catch (Exception e) {
             log.error("기타 예외 발생: {}", e.getMessage());
-            if (upbitOrderResponse != null) {
-                orderService.saveFailedOrder(tradeRequestDto, upbitOrderResponse);
-                attemptCompensation(upbitOrderResponse);
+            saveFailedOrderResult(tradeRequestDto, null);
+        }
+    }
+
+    private void saveOrderResult(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrderResponse, BinanceFuturesOrderResponseDto binanceOrderResponse) {
+        try {
+            orderService.saveSuccessfulOrder(tradeRequestDto, upbitOrderResponse, binanceOrderResponse);
+            log.info("신규 포지션 저장 성공");
+        } catch (Exception e) {
+            log.error("주문 결과 저장 실패: {}", e.getMessage());
+        }
+    }
+
+    private void saveFailedOrderResult(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrderResponse) {
+        try {
+            orderService.saveFailedOrder(tradeRequestDto, upbitOrderResponse);
+        } catch (Exception e) {
+            log.error("실패한 주문 저장 실패: {}", e.getMessage());
+        }
+    }
+
+
+    private void validateBalanceAndPrice(TradeRequestDto tradeRequestDto) {
+        try {
+            // 1. 업비트 KRW 잔고 확인
+            var upbitAccounts = upbitApiClient.getUpbitAccount();
+            BigDecimal krwBalance = BigDecimal.ZERO;
+            for (var account : upbitAccounts) {
+                if ("KRW".equals(account.getCurrency())) {
+                    krwBalance = new BigDecimal(account.getBalance());
+                    break;
+                }
             }
+            
+            if (krwBalance.compareTo(tradeRequestDto.getPrice()) < 0) {
+                throw new UpbitException("INSUFFICIENT_BALANCE", "업비트 KRW 잔고 부족");
+            }
+            
+            // 2. 바이낸스 USDT 잔고 확인
+            BigDecimal requiredUsdAmount = tradeRequestDto.getPrice().divide(getCurrentUsdtKrwRate(), 2, java.math.RoundingMode.UP);
+            validateBinanceBalance(requiredUsdAmount);
+            
+        } catch (UpbitException | BinanceException e) {
+            throw e; // 재던지기
+        } catch (Exception e) {
+            log.error("잔고 확인 중 오류 발생: {}", e.getMessage());
+            throw new UpbitException("VALIDATION_ERROR", "잔고 확인 중 오류 발생");
+        }
+    }
+
+    private BigDecimal getCurrentUpbitPrice(String symbol) {
+        try {
+            var ticker = upbitApiClient.getUpbitTicker(symbol);
+            if (ticker != null && ticker.length > 0) {
+                return new BigDecimal(ticker[0].getTradePrice());
+            }
+            throw new RuntimeException("업비트 가격 조회 실패");
+        } catch (Exception e) {
+            log.error("업비트 가격 조회 실패: {}", e.getMessage());
+            throw new RuntimeException("업비트 가격 조회 실패", e);
+        }
+    }
+
+    private BigDecimal getCurrentBinancePrice(String symbol) {
+        try {
+            var priceInfo = binanceFuturesApiClient.getMarkPrice(symbol);
+            if (priceInfo != null && priceInfo.markPrice() != null) {
+                return priceInfo.markPrice();
+            }
+            throw new RuntimeException("바이낸스 가격 조회 실패");
+        } catch (Exception e) {
+            log.error("바이낸스 가격 조회 실패: {}", e.getMessage());
+            throw new RuntimeException("바이낸스 가격 조회 실패", e);
+        }
+    }
+
+    private BigDecimal getCurrentUsdtKrwRate() {
+        try {
+            // 업비트 USDT-KRW 가격 조회로 환율 계산
+            var ticker = upbitApiClient.getUpbitTicker("KRW-USDT");
+            if (ticker != null && ticker.length > 0) {
+                return new BigDecimal(ticker[0].getTradePrice());
+            }
+            throw new RuntimeException("USDT-KRW 환율 조회 실패");
+        } catch (Exception e) {
+            log.error("USDT-KRW 환율 조회 실패: {}", e.getMessage());
+            throw new RuntimeException("USDT-KRW 환율 조회 실패", e);
+        }
+    }
+
+    private void validateBinanceBalance(BigDecimal requiredUsdAmount) {
+        try {
+            var account = binanceFuturesApiClient.getAccount();
+            if (account == null || account.assets() == null) {
+                throw new BinanceException("ACCOUNT_ERROR", "바이낸스 계좌 정보 조회 실패");
+            }
+
+            // USDT 자산 찾기
+            for (var asset : account.assets()) {
+                if ("USDT".equals(asset.asset())) {
+                    BigDecimal availableBalance = asset.availableBalance();
+                    if (availableBalance.compareTo(requiredUsdAmount) >= 0) {
+                        log.info("바이낸스 USDT 잔고 확인: 필요={}, 보유={}", requiredUsdAmount, availableBalance);
+                        return;
+                    } else {
+                        throw new BinanceException("INSUFFICIENT_BALANCE", "바이낸스 USDT 잔고 부족");
+                    }
+                }
+            }
+            
+            throw new BinanceException("ASSET_NOT_FOUND", "바이낸스 계좌에서 USDT 자산을 찾을 수 없음");
+        } catch (BinanceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("바이낸스 잔고 확인 중 오류 발생: {}", e.getMessage());
+            throw new BinanceException("VALIDATION_ERROR", "바이낸스 잔고 확인 중 오류 발생");
+        }
+    }
+
+    private void attemptBinancePositionClose(String symbol, BinanceFuturesOrderResponseDto binanceOrderResponse) {
+        try {
+            // 생성된 숏 포지션 수량만큼 BUY 주문으로 정리
+            BigDecimal positionQuantity = new BigDecimal(binanceOrderResponse.getExecutedQty());
+            
+            var closeOrderResponse = binanceFuturesApiClient.closePosition(symbol, positionQuantity);
+            log.info("바이낸스 포지션 정리 성공: Symbol={}, Quantity={}, OrderId={}", 
+                    symbol, positionQuantity, closeOrderResponse.getOrderId());
+        } catch (BinanceException e) {
+            log.error("바이낸스 포지션 정리 실패: Symbol={}, Error={}", symbol, e.getMessage());
+            // TODO: 포지션 정리 실패시 알림 또는 재시도 로직 추가
+        } catch (Exception e) {
+            log.error("바이낸스 포지션 정리 중 예외 발생: Symbol={}, Error={}", symbol, e.getMessage());
         }
     }
 
