@@ -15,6 +15,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
@@ -83,6 +84,81 @@ public class BinanceFuturesApiClient {
                 )
                 .bodyToMono(BinanceChangeLeverageResponseDto.class)
 
+                .block();
+    }
+
+    @Retry(name = "externalApi")
+    @CircuitBreaker(name = "binanceFuturesApi", fallbackMethod = "fallback")
+    public BinanceFuturesAccountResponseDto getAccount() throws Exception {
+        
+        String finalPayload = buildSignedPayload(new Object() {}); // 빈 객체로 timestamp만 추가
+
+        return webClient.get()
+                .uri("/fapi/v2/account?" + finalPayload)
+                .header("X-MBX-APIKEY", apiKey)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, clientResponse ->
+                        clientResponse.bodyToMono(BinanceErrorResponse.class)
+                                .flatMap(error -> {
+                                    String code = String.valueOf(error.getCode());
+                                    String msg = error.getMsg();
+                                    return Mono.error(new BinanceException(code, msg));
+                                })
+                )
+                .bodyToMono(BinanceFuturesAccountResponseDto.class)
+                .block();
+    }
+
+    @Retry(name = "externalApi")
+    @CircuitBreaker(name = "binanceFuturesApi", fallbackMethod = "fallback")
+    public BinancePriceResponseDto getMarkPrice(String symbol) {
+        return webClient.get()
+                .uri("/fapi/v1/premiumIndex?symbol=" + symbol)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, clientResponse ->
+                        clientResponse.bodyToMono(BinanceErrorResponse.class)
+                                .flatMap(error -> {
+                                    String code = String.valueOf(error.getCode());
+                                    String msg = error.getMsg();
+                                    return Mono.error(new BinanceException(code, msg));
+                                })
+                )
+                .bodyToMono(BinancePriceResponseDto.class)
+                .block();
+    }
+
+    @Retry(name = "externalApi") 
+    @CircuitBreaker(name = "binanceFuturesApi", fallbackMethod = "fallback")
+    public BinanceFuturesOrderResponseDto closePosition(String symbol, BigDecimal quantity) throws Exception {
+        
+        BinanceFuturesOrderRequestDto closeOrderRequest = BinanceFuturesOrderRequestDto.builder()
+                .symbol(symbol)
+                .side(OrderSide.BUY) // 숏 포지션 정리는 BUY 주문
+                .type(OrderType.MARKET)
+                .quantity(quantity.toPlainString())
+                .newClientOrderId("close-" + System.currentTimeMillis())
+                .newOrderRespType(NewOrderRespType.FULL)
+                .recvWindow(5000L)
+                .timestamp(System.currentTimeMillis())
+                .build();
+
+        String finalPayload = buildSignedPayload(closeOrderRequest);
+
+        return webClient.post()
+                .uri("/fapi/v1/order")
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("X-MBX-APIKEY", apiKey)
+                .bodyValue(finalPayload)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, clientResponse ->
+                        clientResponse.bodyToMono(BinanceErrorResponse.class)
+                                .flatMap(error -> {
+                                    String code = String.valueOf(error.getCode());
+                                    String msg = error.getMsg();
+                                    return Mono.error(new BinanceException(code, msg));
+                                })
+                )
+                .bodyToMono(BinanceFuturesOrderResponseDto.class)
                 .block();
     }
 
