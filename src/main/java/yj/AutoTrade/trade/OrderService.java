@@ -2,6 +2,7 @@ package yj.AutoTrade.trade;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import yj.AutoTrade.binance.dto.BinanceFuturesOrderResponseDto;
 import yj.AutoTrade.binance.dto.BinanceOrderResponseDto;
@@ -19,7 +20,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Order saveSuccessfulOrder(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrder, BinanceOrderResponseDto binanceOrder) {
         Order order = Order.builder()
                 .upbitOrderId(upbitOrder.getUuid())
@@ -35,7 +36,7 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Order saveSuccessfulOrder(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrder, BinanceFuturesOrderResponseDto binanceOrder) {
         Order order = Order.builder()
                 .upbitOrderId(upbitOrder.getUuid())
@@ -51,7 +52,7 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Order saveFailedOrder(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrder) {
         Order.OrderBuilder builder = Order.builder()
                 .upbitSymbol(tradeRequestDto.getUpbitSymbol())
