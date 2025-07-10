@@ -5,14 +5,16 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class ApiResponse {
+public class ApiResponse<T> {
     private String code;
     private String message;
+    private T data;
 
-
-    public static ApiResponse success() {
-        return new ApiResponse("SUCCESS", "요청 성공");
+    public static ApiResponse<Void> success() {
+        return new ApiResponse<>("SUCCESS", "요청 성공", null);
     }
 
-
+    public static <T> ApiResponse<T> success(T data) {
+        return new ApiResponse<>("SUCCESS", "요청 성공", data);
+    }
 }

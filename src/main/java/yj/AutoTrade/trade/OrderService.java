@@ -68,4 +68,37 @@ public class OrderService {
         
         return orderRepository.save(builder.build());
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Order saveCloseOrder(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrder, BinanceFuturesOrderResponseDto binanceOrder) {
+        Order order = Order.builder()
+                .upbitOrderId(upbitOrder.getUuid())
+                .binanceOrderId(binanceOrder.getOrderId().toString())
+                .upbitSymbol(tradeRequestDto.getUpbitSymbol())
+                .binanceSymbol(tradeRequestDto.getBinanceSymbol())
+                .status(OrderStatus.CLOSED)
+                .quantity(upbitOrder.getVolume())
+                .upbitAvgPrice(upbitOrder.getPrice())
+                .binanceAvgPrice(new BigDecimal(binanceOrder.getAvgPrice()))
+                .leverage(tradeRequestDto.getLeverage())
+                .build();
+        return orderRepository.save(order);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Order saveFailedCloseOrder(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrder) {
+        Order.OrderBuilder builder = Order.builder()
+                .upbitSymbol(tradeRequestDto.getUpbitSymbol())
+                .binanceSymbol(tradeRequestDto.getBinanceSymbol())
+                .status(OrderStatus.CLOSE_FAILED)
+                .leverage(tradeRequestDto.getLeverage());
+
+        if (upbitOrder != null) {
+            builder.upbitOrderId(upbitOrder.getUuid())
+                    .quantity(upbitOrder.getVolume())
+                    .upbitAvgPrice(upbitOrder.getPrice());
+        }
+        
+        return orderRepository.save(builder.build());
+    }
 } 
