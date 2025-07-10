@@ -288,4 +288,159 @@ public class TradeService {
             tradeCompensationQueueService.saveToQueue(upbitOrderResponse, compensationException);
         }
     }
+
+    public void closeTrade(TradeRequestDto tradeRequestDto) {
+        try {
+            // 1. 현재 가격 조회로 수량 계산
+            BigDecimal upbitPrice = getCurrentUpbitPrice(tradeRequestDto.getUpbitSymbol());
+            BigDecimal binancePrice = getCurrentBinancePrice(tradeRequestDto.getBinanceSymbol());
+            
+            // 2. 기존 포지션에 해당하는 수량으로 역방향 거래
+            BigDecimal tradeAmount = tradeRequestDto.getPrice();
+            BigDecimal leverage = tradeRequestDto.getLeverage();
+            
+            // 업비트 매도 수량 (보유 수량)
+            BigDecimal upbitQuantity = tradeAmount.divide(upbitPrice, 8, java.math.RoundingMode.DOWN);
+            
+            // 바이낸스 숏 포지션 정리 수량 (기존 숏과 동일한 수량으로 BUY)
+            BigDecimal usdtKrwRate = getCurrentUsdtKrwRate();
+            BigDecimal usdAmount = tradeAmount.divide(usdtKrwRate, 2, java.math.RoundingMode.DOWN);
+            BigDecimal binanceQuantity = usdAmount.multiply(leverage).divide(binancePrice, 8, java.math.RoundingMode.DOWN);
+
+            // 3. 동시 주문 실행 (역방향)
+            UpbitOrderRequestDto upbitOrderRequest = UpbitOrderRequestDto.builder()
+                    .market(tradeRequestDto.getUpbitSymbol())
+                    .volume(upbitQuantity)
+                    .ordType(UpbitOrderType.MARKET)
+                    .side("ask") // 매도
+                    .build();
+
+            BinanceFuturesOrderRequestDto binanceOrderRequest = BinanceFuturesOrderRequestDto.builder()
+                    .symbol(tradeRequestDto.getBinanceSymbol())
+                    .side(OrderSide.BUY) // 숏 정리
+                    .type(OrderType.MARKET)
+                    .quantity(binanceQuantity.toPlainString())
+                    .newClientOrderId("close-" + System.currentTimeMillis())
+                    .newOrderRespType(NewOrderRespType.FULL)
+                    .recvWindow(5000L)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+
+            // 4. 동시 주문 실행
+            CompletableFuture<UpbitOrderResponseDto> upbitFuture = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return upbitApiClient.createOrder(upbitOrderRequest);
+                } catch (UpbitException e) {
+                    log.error("Upbit 매도 주문 실패: {}", e.getMessage());
+                    return null;
+                } catch (Exception e) {
+                    log.error("Upbit 매도 주문 중 예외 발생: {}", e.getMessage());
+                    return null;
+                }
+            });
+
+            CompletableFuture<BinanceFuturesOrderResponseDto> binanceFuture = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return binanceFuturesApiClient.createOrder(binanceOrderRequest);
+                } catch (BinanceException e) {
+                    log.error("Binance 숏 정리 주문 실패: {}", e.getMessage());
+                    return null;
+                } catch (Exception e) {
+                    log.error("Binance 숏 정리 주문 중 예외 발생: {}", e.getMessage());
+                    return null;
+                }
+            });
+
+            // 5. 주문 결과 대기
+            UpbitOrderResponseDto upbitOrderResponse = upbitFuture.get();
+            BinanceFuturesOrderResponseDto binanceOrderResponse = binanceFuture.get();
+
+            // 6. 결과 처리
+            if (upbitOrderResponse == null && binanceOrderResponse == null) {
+                log.error("업비트, 바이낸스 모두 포지션 정리 실패");
+                saveFailedCloseOrderResult(tradeRequestDto, null);
+                
+            } else if (upbitOrderResponse == null) {
+                log.error("Upbit 매도 실패, Binance 숏 정리 성공 - 업비트 보상 매수 필요");
+                saveFailedCloseOrderResult(tradeRequestDto, null);
+                attemptUpbitCompensationBuy(tradeRequestDto, binanceOrderResponse);
+                
+            } else if (binanceOrderResponse == null) {
+                log.error("Binance 숏 정리 실패, 업비트 매도 성공 - 바이낸스 포지션 재정리 필요");
+                saveFailedCloseOrderResult(tradeRequestDto, upbitOrderResponse);
+                attemptBinanceCompensationClose(tradeRequestDto, upbitOrderResponse);
+                
+            } else {
+                log.info("Upbit 매도 주문 성공: {}", upbitOrderResponse.getUuid());
+                log.info("Binance 숏 정리 주문 성공: {}", binanceOrderResponse.getOrderId());
+                saveCloseOrderResult(tradeRequestDto, upbitOrderResponse, binanceOrderResponse);
+            }
+
+        } catch (InterruptedException e) {
+            log.error("포지션 정리 중 인터럽트 발생: {}", e.getMessage());
+            Thread.currentThread().interrupt();
+            saveFailedCloseOrderResult(tradeRequestDto, null);
+        } catch (Exception e) {
+            log.error("포지션 정리 중 기타 예외 발생: {}", e.getMessage());
+            saveFailedCloseOrderResult(tradeRequestDto, null);
+        }
+    }
+
+    private void saveCloseOrderResult(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrderResponse, BinanceFuturesOrderResponseDto binanceOrderResponse) {
+        try {
+            orderService.saveCloseOrder(tradeRequestDto, upbitOrderResponse, binanceOrderResponse);
+            log.info("포지션 정리 결과 저장 성공");
+        } catch (Exception e) {
+            log.error("포지션 정리 결과 저장 실패: {}", e.getMessage());
+        }
+    }
+
+    private void saveFailedCloseOrderResult(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrderResponse) {
+        try {
+            orderService.saveFailedCloseOrder(tradeRequestDto, upbitOrderResponse);
+        } catch (Exception e) {
+            log.error("실패한 포지션 정리 주문 저장 실패: {}", e.getMessage());
+        }
+    }
+
+    private void attemptUpbitCompensationBuy(TradeRequestDto tradeRequestDto, BinanceFuturesOrderResponseDto binanceOrderResponse) {
+        try {
+            BigDecimal upbitPrice = getCurrentUpbitPrice(tradeRequestDto.getUpbitSymbol());
+            BigDecimal compensationAmount = new BigDecimal(binanceOrderResponse.getExecutedQty()).multiply(upbitPrice);
+            
+            UpbitOrderRequestDto compensateRequest = UpbitOrderRequestDto.builder()
+                    .market(tradeRequestDto.getUpbitSymbol())
+                    .price(compensationAmount)
+                    .ordType(UpbitOrderType.MARKET)
+                    .side("bid") // 매수
+                    .build();
+            
+            upbitApiClient.createOrder(compensateRequest);
+            log.info("업비트 보상 매수 주문 성공. Market: {}, Amount: {}", tradeRequestDto.getUpbitSymbol(), compensationAmount);
+        } catch (Exception e) {
+            log.error("업비트 보상 매수 주문 실패: {}", e.getMessage());
+            // TODO: 보상 매수 실패시 큐에 저장하는 로직 추가
+        }
+    }
+
+    private void attemptBinanceCompensationClose(TradeRequestDto tradeRequestDto, UpbitOrderResponseDto upbitOrderResponse) {
+        try {
+            BigDecimal upbitVolume = upbitOrderResponse.getVolume();
+            BigDecimal binancePrice = getCurrentBinancePrice(tradeRequestDto.getBinanceSymbol());
+            BigDecimal usdtKrwRate = getCurrentUsdtKrwRate();
+            
+            // 업비트 매도량을 바이낸스 수량으로 환산
+            BigDecimal upbitPrice = getCurrentUpbitPrice(tradeRequestDto.getUpbitSymbol());
+            BigDecimal krwAmount = upbitVolume.multiply(upbitPrice);
+            BigDecimal usdAmount = krwAmount.divide(usdtKrwRate, 2, java.math.RoundingMode.DOWN);
+            BigDecimal binanceQuantity = usdAmount.multiply(tradeRequestDto.getLeverage()).divide(binancePrice, 8, java.math.RoundingMode.DOWN);
+            
+            var closeOrderResponse = binanceFuturesApiClient.closePosition(tradeRequestDto.getBinanceSymbol(), binanceQuantity);
+            log.info("바이낸스 보상 포지션 정리 성공: Symbol={}, Quantity={}, OrderId={}", 
+                    tradeRequestDto.getBinanceSymbol(), binanceQuantity, closeOrderResponse.getOrderId());
+        } catch (Exception e) {
+            log.error("바이낸스 보상 포지션 정리 실패: Symbol={}, Error={}", tradeRequestDto.getBinanceSymbol(), e.getMessage());
+            // TODO: 보상 포지션 정리 실패시 큐에 저장하는 로직 추가
+        }
+    }
 }
