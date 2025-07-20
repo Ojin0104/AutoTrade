@@ -23,4 +23,11 @@ public class TradeController {
         return ResponseEntity.ok(ApiResponse.success());
     }
 
+    @PostMapping("/close")
+    @Operation(summary = "포지션 정리", description = "업비트 매도 및 바이낸스 숏 포지션을 정리합니다.")
+    public ResponseEntity closeTrade(@RequestBody TradeRequestDto tradeRequestDto){
+        tradeService.closeTrade(tradeRequestDto);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
 }
