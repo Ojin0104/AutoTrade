@@ -3,20 +3,21 @@ package yj.AutoTrade.trade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import yj.AutoTrade.binance.BinanceException;
-import yj.AutoTrade.binance.BinanceFuturesApiClient;
-import yj.AutoTrade.binance.dto.BinanceFuturesOrderRequestDto;
-import yj.AutoTrade.binance.dto.BinanceFuturesOrderResponseDto;
-import yj.AutoTrade.binance.dto.BinanceChangeLeverageRequestDto;
-import yj.AutoTrade.binance.dto.OrderSide;
-import yj.AutoTrade.binance.dto.OrderType;
-import yj.AutoTrade.binance.dto.NewOrderRespType;
+import yj.AutoTrade.api.binance.BinanceException;
+import yj.AutoTrade.api.binance.BinanceFuturesApiClient;
+import yj.AutoTrade.api.binance.dto.BinanceFuturesOrderRequestDto;
+import yj.AutoTrade.api.binance.dto.BinanceFuturesOrderResponseDto;
+import yj.AutoTrade.api.binance.dto.BinanceChangeLeverageRequestDto;
+import yj.AutoTrade.api.binance.dto.OrderSide;
+import yj.AutoTrade.api.binance.dto.OrderType;
+import yj.AutoTrade.api.binance.dto.NewOrderRespType;
 import yj.AutoTrade.trade.dto.TradeRequestDto;
-import yj.AutoTrade.upbit.UpbitApiClient;
-import yj.AutoTrade.upbit.UpbitException;
-import yj.AutoTrade.upbit.dto.UpbitOrderRequestDto;
-import yj.AutoTrade.upbit.dto.UpbitOrderResponseDto;
-import yj.AutoTrade.upbit.dto.UpbitOrderType;
+import yj.AutoTrade.api.upbit.UpbitApiClient;
+import yj.AutoTrade.api.upbit.UpbitException;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderRequestDto;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderResponseDto;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderType;
+import yj.AutoTrade.exception.ErrorCode;
 
 import java.math.BigDecimal;
 import java.util.concurrent.CompletableFuture;
@@ -173,7 +174,7 @@ public class TradeService {
             }
             
             if (krwBalance.compareTo(tradeRequestDto.getPrice()) < 0) {
-                throw new UpbitException("INSUFFICIENT_BALANCE", "업비트 KRW 잔고 부족");
+                throw new UpbitException(ErrorCode.UPBIT_INSUFFICIENT_BALANCE);
             }
             
             // 2. 바이낸스 USDT 잔고 확인
@@ -184,7 +185,7 @@ public class TradeService {
             throw e; // 재던지기
         } catch (Exception e) {
             log.error("잔고 확인 중 오류 발생: {}", e.getMessage());
-            throw new UpbitException("VALIDATION_ERROR", "잔고 확인 중 오류 발생");
+            throw new UpbitException(ErrorCode.TRADE_BALANCE_VALIDATION_FAILED, e);
         }
     }
 
@@ -232,7 +233,7 @@ public class TradeService {
         try {
             var account = binanceFuturesApiClient.getAccount();
             if (account == null || account.assets() == null) {
-                throw new BinanceException("ACCOUNT_ERROR", "바이낸스 계좌 정보 조회 실패");
+                throw new BinanceException(ErrorCode.BINANCE_API_ERROR);
             }
 
             // USDT 자산 찾기
@@ -243,17 +244,17 @@ public class TradeService {
                         log.info("바이낸스 USDT 잔고 확인: 필요={}, 보유={}", requiredUsdAmount, availableBalance);
                         return;
                     } else {
-                        throw new BinanceException("INSUFFICIENT_BALANCE", "바이낸스 USDT 잔고 부족");
+                        throw new BinanceException(ErrorCode.BINANCE_INSUFFICIENT_BALANCE);
                     }
                 }
             }
             
-            throw new BinanceException("ASSET_NOT_FOUND", "바이낸스 계좌에서 USDT 자산을 찾을 수 없음");
+            throw new BinanceException(ErrorCode.BINANCE_API_ERROR);
         } catch (BinanceException e) {
             throw e;
         } catch (Exception e) {
             log.error("바이낸스 잔고 확인 중 오류 발생: {}", e.getMessage());
-            throw new BinanceException("VALIDATION_ERROR", "바이낸스 잔고 확인 중 오류 발생");
+            throw new BinanceException(ErrorCode.TRADE_BALANCE_VALIDATION_FAILED, e);
         }
     }
 

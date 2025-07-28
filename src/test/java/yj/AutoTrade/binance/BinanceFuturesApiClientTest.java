@@ -6,7 +6,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import yj.AutoTrade.binance.dto.*;
+import yj.AutoTrade.api.binance.BinanceFuturesApiClient;
+import yj.AutoTrade.api.binance.dto.*;
 
 @SpringBootTest
 public class BinanceFuturesApiClientTest {

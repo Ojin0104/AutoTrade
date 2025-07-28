@@ -1,4 +1,4 @@
-package yj.AutoTrade.binance.dto;
+package yj.AutoTrade.api.binance.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.math.BigDecimal;

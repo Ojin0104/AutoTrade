@@ -2,20 +2,27 @@ package yj.AutoTrade.exception;
 
 public class TradeException extends RuntimeException {
 
-    private final String errorCode; // 코드도 유지하고
-    private final String errorMessage; // 외부 API에서 받은 에러 메시지
+    private final ErrorCode errorCode;
 
-    public TradeException(String errorCode, String errorMessage) {
-        super(errorMessage); // Exception 메시지에도 저장
+    public TradeException(ErrorCode errorCode) {
+        super(errorCode.getMessage());
         this.errorCode = errorCode;
-        this.errorMessage = errorMessage;
     }
 
-    public String getErrorCode() {
+    public TradeException(ErrorCode errorCode, Throwable cause) {
+        super(errorCode.getMessage(), cause);
+        this.errorCode = errorCode;
+    }
+
+    public ErrorCode getErrorCode() {
         return errorCode;
     }
 
+    public String getErrorCodeValue() {
+        return errorCode.getCode();
+    }
+
     public String getErrorMessage() {
-        return errorMessage;
+        return errorCode.getMessage();
     }
 }

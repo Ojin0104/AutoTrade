@@ -3,11 +3,11 @@ package yj.AutoTrade.service;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import yj.AutoTrade.binance.BinanceApiClient;
-import yj.AutoTrade.binance.dto.BinanceTickerPriceDto;
+import yj.AutoTrade.api.binance.BinanceApiClient;
+import yj.AutoTrade.api.binance.dto.BinanceTickerPriceDto;
 import yj.AutoTrade.trade.PriceGapCalculator;
-import yj.AutoTrade.upbit.UpbitApiClient;
-import yj.AutoTrade.upbit.dto.UpbitTickerResponseDto;
+import yj.AutoTrade.api.upbit.UpbitApiClient;
+import yj.AutoTrade.api.upbit.dto.UpbitTickerResponseDto;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

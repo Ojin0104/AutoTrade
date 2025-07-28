@@ -21,8 +21,8 @@ public class JwtTokenService {
     private final int jwtExpirationMs;
     private final SecretKey key;
 
-    public JwtTokenService(@Value("${app.jwt.secret:mySecretKey}") String jwtSecret,
-                          @Value("${app.jwt.expiration:86400000}") int jwtExpirationMs) {
+    public JwtTokenService(@Value("${app.jwt.secret}") String jwtSecret,
+                          @Value("${app.jwt.expiration}") int jwtExpirationMs) {
         this.jwtSecret = jwtSecret;
         this.jwtExpirationMs = jwtExpirationMs;
         this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes());

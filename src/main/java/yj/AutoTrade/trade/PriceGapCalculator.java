@@ -3,11 +3,12 @@ package yj.AutoTrade.trade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import yj.AutoTrade.binance.BinanceApiClient;
-import yj.AutoTrade.upbit.UpbitApiClient;
-import yj.AutoTrade.upbit.UpbitException;
-import yj.AutoTrade.upbit.dto.UpbitTickerResponseDto;
-import yj.AutoTrade.binance.dto.BinanceTickerPriceDto;
+import yj.AutoTrade.api.binance.BinanceApiClient;
+import yj.AutoTrade.api.upbit.UpbitApiClient;
+import yj.AutoTrade.api.upbit.UpbitException;
+import yj.AutoTrade.api.upbit.dto.UpbitTickerResponseDto;
+import yj.AutoTrade.api.binance.dto.BinanceTickerPriceDto;
+import yj.AutoTrade.api.exchange.ExchangeRateService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -18,21 +19,40 @@ import java.math.RoundingMode;
 public class PriceGapCalculator {
     private final UpbitApiClient upbitApiClient;
     private final BinanceApiClient binanceApiClient;
+    private final ExchangeRateService exchangeRateService;
 
     /**
-     * 실시간 USD/KRW 환율 조회 (업비트 USDT/KRW 가격 사용)
+     * 실시간 USD/KRW 환율 조회 (한국은행 Open API 사용)
      * @return USD/KRW 환율
-     * @throws UpbitException 업비트 API 오류 시
      */
     private BigDecimal getCurrentExchangeRate() {
-        UpbitTickerResponseDto[] usdtTickers = upbitApiClient.getUpbitTicker("KRW-USDT");
-        if (usdtTickers == null || usdtTickers.length == 0) {
-            throw new RuntimeException("업비트 USDT 가격 정보를 가져올 수 없습니다.");
+        try {
+            BigDecimal exchangeRate = exchangeRateService.getCurrentUsdKrwRate();
+            log.debug("실시간 USD/KRW 환율 (한국은행): {}", exchangeRate);
+            return exchangeRate;
+        } catch (Exception e) {
+            log.warn("한국은행 환율 조회 실패, 업비트 USDT 가격으로 대체: {}", e.getMessage());
+            return getUsdtRateFromUpbit();
         }
-        
-        BigDecimal usdtPrice = new BigDecimal(usdtTickers[0].getTradePrice());
-        log.debug("실시간 USD/KRW 환율: {}", usdtPrice);
-        return usdtPrice;
+    }
+
+    /**
+     * 업비트 USDT/KRW 가격으로 환율 대체 (한국은행 API 실패시)
+     */
+    private BigDecimal getUsdtRateFromUpbit() {
+        try {
+            UpbitTickerResponseDto[] usdtTickers = upbitApiClient.getUpbitTicker("KRW-USDT");
+            if (usdtTickers == null || usdtTickers.length == 0) {
+                throw new RuntimeException("업비트 USDT 가격 정보를 가져올 수 없습니다.");
+            }
+            
+            BigDecimal usdtPrice = new BigDecimal(usdtTickers[0].getTradePrice());
+            log.debug("대체 환율 (업비트 USDT): {}", usdtPrice);
+            return usdtPrice;
+        } catch (Exception e) {
+            log.error("업비트 USDT 가격 조회도 실패, 기본값 사용: {}", e.getMessage());
+            return new BigDecimal("1300.00"); // 기본 환율
+        }
     }
 
     /**

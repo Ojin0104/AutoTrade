@@ -2,14 +2,17 @@ package yj.AutoTrade.trade;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.*;
-import yj.AutoTrade.binance.BinanceException;
-import yj.AutoTrade.binance.BinanceFuturesApiClient;
-import yj.AutoTrade.binance.dto.*;
+import yj.AutoTrade.api.binance.BinanceException;
+import yj.AutoTrade.api.binance.BinanceFuturesApiClient;
+import yj.AutoTrade.api.binance.dto.BinanceChangeLeverageRequestDto;
+import yj.AutoTrade.api.binance.dto.BinanceFuturesOrderRequestDto;
+import yj.AutoTrade.api.binance.dto.BinanceFuturesOrderResponseDto;
+import yj.AutoTrade.api.binance.dto.BinanceOrderResponseDto;
 import yj.AutoTrade.trade.dto.TradeRequestDto;
-import yj.AutoTrade.upbit.UpbitApiClient;
-import yj.AutoTrade.upbit.UpbitException;
-import yj.AutoTrade.upbit.dto.UpbitOrderRequestDto;
-import yj.AutoTrade.upbit.dto.UpbitOrderResponseDto;
+import yj.AutoTrade.api.upbit.UpbitApiClient;
+import yj.AutoTrade.api.upbit.UpbitException;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderRequestDto;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderResponseDto;
 
 import java.math.BigDecimal;
 

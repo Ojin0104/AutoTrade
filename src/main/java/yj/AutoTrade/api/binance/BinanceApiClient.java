@@ -1,4 +1,4 @@
-package yj.AutoTrade.binance;
+package yj.AutoTrade.api.binance;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,7 +7,11 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import yj.AutoTrade.binance.dto.*;
+import yj.AutoTrade.api.binance.dto.BinanceErrorResponse;
+import yj.AutoTrade.api.binance.dto.BinanceOrderRequestDto;
+import yj.AutoTrade.api.binance.dto.BinanceOrderResponseDto;
+import yj.AutoTrade.api.binance.dto.BinanceTickerPriceDto;
+import yj.AutoTrade.exception.ErrorCode;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -84,7 +88,7 @@ public class BinanceApiClient {
                                 .flatMap(error -> {
                                     String code = String.valueOf(error.getCode());
                                     String msg = error.getMsg();
-                                    return Mono.error(new BinanceException(code, msg));
+                                    return Mono.error(new BinanceException(ErrorCode.BINANCE_API_ERROR));
                                 })
                 )
                 .bodyToMono(BinanceOrderResponseDto.class)
@@ -121,7 +125,7 @@ public class BinanceApiClient {
             byte[] rawHmac = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             return bytesToHex(rawHmac);
         } catch (Exception e) {
-            throw new BinanceException("wrong hashAlgorithm",e.getMessage());
+            throw new BinanceException(ErrorCode.BINANCE_API_ERROR, e);
         }
     }
 

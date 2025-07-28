@@ -1,4 +1,4 @@
-package yj.AutoTrade.upbit.dto;
+package yj.AutoTrade.api.upbit.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

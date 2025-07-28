@@ -1,4 +1,4 @@
-package yj.AutoTrade.binance;
+package yj.AutoTrade.api.binance;
 
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -10,7 +10,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.reactive.function.client.WebClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Mono;
-import yj.AutoTrade.binance.dto.*;
+import yj.AutoTrade.api.binance.dto.*;
+import yj.AutoTrade.exception.ErrorCode;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 import javax.crypto.Mac;
@@ -60,7 +61,7 @@ public class BinanceFuturesApiClient {
                                 .flatMap(error -> {
                                     String code = String.valueOf(error.getCode());
                                     String msg = error.getMsg();
-                                    return Mono.error(new BinanceException(code, msg));
+                                    return Mono.error(new BinanceException(ErrorCode.BINANCE_API_ERROR));
                                 })
                 )
                 .bodyToMono(BinanceFuturesOrderResponseDto.class)
@@ -102,7 +103,7 @@ public class BinanceFuturesApiClient {
                                 .flatMap(error -> {
                                     String code = String.valueOf(error.getCode());
                                     String msg = error.getMsg();
-                                    return Mono.error(new BinanceException(code, msg));
+                                    return Mono.error(new BinanceException(ErrorCode.BINANCE_API_ERROR));
                                 })
                 )
                 .bodyToMono(BinanceFuturesAccountResponseDto.class)
@@ -120,7 +121,7 @@ public class BinanceFuturesApiClient {
                                 .flatMap(error -> {
                                     String code = String.valueOf(error.getCode());
                                     String msg = error.getMsg();
-                                    return Mono.error(new BinanceException(code, msg));
+                                    return Mono.error(new BinanceException(ErrorCode.BINANCE_API_ERROR));
                                 })
                 )
                 .bodyToMono(BinancePriceResponseDto.class)
@@ -155,7 +156,7 @@ public class BinanceFuturesApiClient {
                                 .flatMap(error -> {
                                     String code = String.valueOf(error.getCode());
                                     String msg = error.getMsg();
-                                    return Mono.error(new BinanceException(code, msg));
+                                    return Mono.error(new BinanceException(ErrorCode.BINANCE_API_ERROR));
                                 })
                 )
                 .bodyToMono(BinanceFuturesOrderResponseDto.class)

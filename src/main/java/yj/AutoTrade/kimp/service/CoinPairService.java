@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import yj.AutoTrade.kimp.entity.CoinPair;
 import yj.AutoTrade.kimp.repository.CoinPairRepository;
+import yj.AutoTrade.exception.ErrorCode;
+import yj.AutoTrade.exception.TradeException;
 
 import java.util.List;
 
@@ -33,8 +35,7 @@ public class CoinPairService {
         // 중복 체크
         if (coinPairRepository.existsByUpbitSymbolAndBinanceSymbol(
                 coinPair.getUpbitSymbol(), coinPair.getBinanceSymbol())) {
-            throw new RuntimeException("이미 존재하는 코인 페어입니다: " + 
-                    coinPair.getUpbitSymbol() + " -> " + coinPair.getBinanceSymbol());
+            throw new TradeException(ErrorCode.COIN_PAIR_DUPLICATE);
         }
 
         CoinPair saved = coinPairRepository.save(coinPair);
@@ -45,7 +46,7 @@ public class CoinPairService {
 
     public CoinPair updateCoinPair(Long id, CoinPair coinPair) {
         CoinPair existing = coinPairRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("코인 페어를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new TradeException(ErrorCode.COIN_PAIR_NOT_FOUND));
 
         existing.setUpbitSymbol(coinPair.getUpbitSymbol());
         existing.setBinanceSymbol(coinPair.getBinanceSymbol());
@@ -59,7 +60,7 @@ public class CoinPairService {
 
     public void toggleActive(Long id) {
         CoinPair coinPair = coinPairRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("코인 페어를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new TradeException(ErrorCode.COIN_PAIR_NOT_FOUND));
 
         if (coinPair.getIsActive()) {
             coinPair.deactivate();
@@ -74,7 +75,7 @@ public class CoinPairService {
 
     public void toggleBatch(Long id) {
         CoinPair coinPair = coinPairRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("코인 페어를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new TradeException(ErrorCode.COIN_PAIR_NOT_FOUND));
 
         if (coinPair.isBatchEnabled()) {
             coinPair.disableBatch();
@@ -89,7 +90,7 @@ public class CoinPairService {
 
     public void enableBatch(Long id) {
         CoinPair coinPair = coinPairRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("코인 페어를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new TradeException(ErrorCode.COIN_PAIR_NOT_FOUND));
 
         coinPair.enableBatch();
         coinPairRepository.save(coinPair);
@@ -98,7 +99,7 @@ public class CoinPairService {
 
     public void disableBatch(Long id) {
         CoinPair coinPair = coinPairRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("코인 페어를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new TradeException(ErrorCode.COIN_PAIR_NOT_FOUND));
 
         coinPair.disableBatch();
         coinPairRepository.save(coinPair);
@@ -107,7 +108,7 @@ public class CoinPairService {
 
     public void deleteCoinPair(Long id) {
         CoinPair coinPair = coinPairRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("코인 페어를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new TradeException(ErrorCode.COIN_PAIR_NOT_FOUND));
 
         coinPairRepository.delete(coinPair);
         log.info("코인 페어 삭제: {} -> {}", coinPair.getUpbitSymbol(), coinPair.getBinanceSymbol());
