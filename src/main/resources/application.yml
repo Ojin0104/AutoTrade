@@ -24,6 +24,11 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
+app:
+  jwt:
+    secret: ${JWT_SECRET_KEY:mySecretKeyForJwtTokenServiceShouldBeAtLeast256BitsLongToWorkProperly}
+    expiration: ${JWT_EXPIRATION_MS:86400000}
+
 upbit:
   url:  ${UPBIT_URL}
   access-key: ${UPBIT_ACCESS_KEY}
@@ -34,6 +39,11 @@ binance:
   futures-url: ${BINANCE_FUTURES_URL}
   api-key: ${BINANCE_API_KEY}
   secret-key: ${BINANCE_SECRET_KEY}
+
+exchange:
+  api:
+    url: ${EXCHANGE_API_URL}
+    key: ${EXCHANGE_API_KEY}
 
 
 resilience4j:
