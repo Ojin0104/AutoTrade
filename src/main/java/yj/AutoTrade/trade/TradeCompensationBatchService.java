@@ -7,11 +7,11 @@ import org.springframework.stereotype.Service;
 import yj.AutoTrade.trade.entity.TradeCompensationQueue;
 import yj.AutoTrade.trade.entity.TradeCompensationStatus;
 import yj.AutoTrade.trade.repository.TradeCompensationQueueRepository;
-import yj.AutoTrade.upbit.UpbitApiClient;
-import yj.AutoTrade.upbit.UpbitException;
-import yj.AutoTrade.upbit.dto.UpbitOrderRequestDto;
-import yj.AutoTrade.upbit.dto.UpbitOrderResponseDto;
-import yj.AutoTrade.upbit.dto.UpbitOrderType;
+import yj.AutoTrade.api.upbit.UpbitApiClient;
+import yj.AutoTrade.api.upbit.UpbitException;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderRequestDto;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderResponseDto;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderType;
 
 import java.time.LocalDateTime;
 import java.util.List;

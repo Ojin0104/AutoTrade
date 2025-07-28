@@ -4,13 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import yj.AutoTrade.binance.dto.BinanceFuturesOrderResponseDto;
-import yj.AutoTrade.binance.dto.BinanceOrderResponseDto;
+import yj.AutoTrade.api.binance.dto.BinanceFuturesOrderResponseDto;
+import yj.AutoTrade.api.binance.dto.BinanceOrderResponseDto;
 import yj.AutoTrade.trade.dto.TradeRequestDto;
 import yj.AutoTrade.trade.entity.Order;
 import yj.AutoTrade.trade.entity.OrderStatus;
 import yj.AutoTrade.trade.repository.OrderRepository;
-import yj.AutoTrade.upbit.dto.UpbitOrderResponseDto;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderResponseDto;
 
 import java.math.BigDecimal;
 

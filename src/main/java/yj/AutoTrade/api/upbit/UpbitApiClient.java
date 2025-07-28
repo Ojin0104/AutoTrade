@@ -1,4 +1,4 @@
-package yj.AutoTrade.upbit;
+package yj.AutoTrade.api.upbit;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -9,7 +9,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import yj.AutoTrade.upbit.dto.*;
+import yj.AutoTrade.api.upbit.dto.*;
+import yj.AutoTrade.exception.ErrorCode;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -71,7 +72,7 @@ public class UpbitApiClient {
 
             return "Bearer " + jwtToken;
         }catch(NoSuchAlgorithmException e){
-            throw new UpbitException("wrong hashAlgorithm",e.getMessage());
+            throw new UpbitException(ErrorCode.UPBIT_API_ERROR, e);
         }
     }
 
@@ -109,7 +110,8 @@ public class UpbitApiClient {
                                 .flatMap(error -> {
                                     String errorCode = error.getError().getName();       // 예: "invalid_order"
                                     String errorMessage = error.getError().getMessage(); // 예: "주문 수량이 부족합니다."
-                                    return Mono.error(new UpbitException(errorCode, errorMessage));
+                                    ErrorCode mappedErrorCode = mapUpbitErrorCode(errorCode);
+                                    return Mono.error(new UpbitException(mappedErrorCode));
                                 })
                 )
                 .bodyToMono(UpbitOrderResponseDto.class)
@@ -117,7 +119,21 @@ public class UpbitApiClient {
     }
 
     private <T> T fallback(Object request, Throwable t) {
-        log.error("[CircuitBreaker Fallback] BinanceFuturesApiClient: " + t.getMessage());
-        throw new RuntimeException("BinanceFuturesApiClient fallback: " + t.getMessage(), t);
+        log.error("[CircuitBreaker Fallback] UpbitApiClient: " + t.getMessage());
+        throw new RuntimeException("UpbitApiClient fallback: " + t.getMessage(), t);
+    }
+
+    /**
+     * Upbit API 에러 코드를 내부 ErrorCode로 매핑
+     */
+    private ErrorCode mapUpbitErrorCode(String upbitErrorCode) {
+        return switch (upbitErrorCode.toLowerCase()) {
+            case "insufficient_funds_ask", "insufficient_funds_bid" -> ErrorCode.UPBIT_INSUFFICIENT_BALANCE;
+            case "invalid_order", "invalid_parameter" -> ErrorCode.UPBIT_ORDER_ERROR;
+            case "too_many_requests" -> ErrorCode.UPBIT_RATE_LIMIT;
+            case "market_does_not_exist" -> ErrorCode.UPBIT_INVALID_SYMBOL;
+            case "jwt_verification" -> ErrorCode.UPBIT_AUTHENTICATION_ERROR;
+            default -> ErrorCode.UPBIT_API_ERROR;
+        };
     }
 }

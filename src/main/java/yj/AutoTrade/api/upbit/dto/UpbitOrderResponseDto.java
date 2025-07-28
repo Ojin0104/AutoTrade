@@ -1,4 +1,4 @@
-package yj.AutoTrade.upbit.dto;
+package yj.AutoTrade.api.upbit.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
