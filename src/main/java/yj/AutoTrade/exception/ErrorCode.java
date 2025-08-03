@@ -57,6 +57,8 @@ public enum ErrorCode {
     EXCHANGE_RATE_SERVICE_UNAVAILABLE("E002", "환율 서비스를 이용할 수 없습니다"),
     EXCHANGE_RATE_TIMEOUT("E003", "환율 API 요청 시간이 초과되었습니다"),
     EXCHANGE_RATE_FALLBACK_FAILED("E004", "대체 환율 조회에도 실패했습니다"),
+    EXCHANGE_RATE_DATA_NOT_FOUND("E005", "환율 데이터를 찾을 수 없습니다"),
+    EXCHANGE_RATE_DATA_EMPTY("E006", "환율 데이터가 비어있습니다"),
     
     // === 김프 데이터 에러 (K000~K099) ===
     KIMP_CALCULATION_ERROR("K000", "김프 계산 중 오류가 발생했습니다"),
