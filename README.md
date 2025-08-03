@@ -63,7 +63,6 @@ AutoTrade는 **업비트와 바이낸스 간의 김치프리미엄을 활용한 
 - **Spring Security** - 인증 및 보안
 - **Spring Data JPA** - 데이터 액세스 레이어
 - **Spring Batch** - 배치 처리 (자동매매)
-- **Spring WebFlux** - 반응형 HTTP 클라이언트
 
 ### Database & ORM
 - **MySQL 8.0** - 메인 데이터베이스
@@ -181,17 +180,6 @@ curl -X POST http://localhost:8080/api/coin-pairs \
 
 ### 주요 API 엔드포인트
 
-#### 🔐 인증 API (`/api/auth`)
-```bash
-# 회원가입
-POST /api/auth/signup
-
-# 로그인 
-POST /api/auth/login
-
-# 이메일 중복 확인
-GET /api/auth/check-email?email=user@example.com
-```
 
 #### 📊 김프 데이터 API (`/api/kimp`) - 공개 접근
 ```bash
@@ -204,15 +192,6 @@ GET /api/kimp/latest/KRW-BTC/BTCUSDT
 # 김프 히스토리 조회
 GET /api/kimp/history/KRW-BTC/BTCUSDT?startTime=2024-01-01T00:00:00&endTime=2024-01-02T00:00:00
 
-# 수익성 김프 조회
-GET /api/kimp/profitable?upbitSymbol=KRW-BTC&binanceSymbol=BTCUSDT&minKimp=2.5
-
-# 김프 통계
-GET /api/kimp/statistics/KRW-BTC/BTCUSDT?hours=24
-
-# 수동 김프 수집
-POST /api/kimp/collect-now
-```
 
 #### 🪙 코인 페어 관리 API (`/api/coin-pairs`) - 공개 접근
 ```bash
@@ -339,9 +318,6 @@ curl http://localhost:8080/api/kimp/latest
 
 # 특정 코인의 김프 통계
 curl "http://localhost:8080/api/kimp/statistics/KRW-BTC/BTCUSDT?hours=24"
-
-# 수익성 높은 김프 조회
-curl "http://localhost:8080/api/kimp/profitable?upbitSymbol=KRW-BTC&binanceSymbol=BTCUSDT&minKimp=3.0&hours=1"
 ```
 
 #### 자동매매 상태 확인
@@ -350,7 +326,6 @@ curl "http://localhost:8080/api/kimp/profitable?upbitSymbol=KRW-BTC&binanceSymbo
 curl -H "Authorization: Bearer $JWT_TOKEN" \
   http://localhost:8080/api/autotrade/active
 
-# 거래 히스토리 확인 (Swagger UI 사용 권장)
 ```
 
 ### 4. 수동 거래 (테스트용)
@@ -380,20 +355,7 @@ curl -X POST http://localhost:8080/api/trade/order \
 | **보상 거래 처리** | 5분마다 | 실패한 거래의 보상 처리 재시도
 
 
-
 ## 🛡️ 보안 및 리스크 관리
-
-### 인증 및 보안
-
-#### JWT 토큰 기반 인증
-- **토큰 유효기간**: 24시간
-- **갱신 방식**: 재로그인 필요
-- **암호화**: HMAC-SHA256
-
-#### API 키 보안
-- **암호화 저장**: 거래소 API 키 암호화하여 데이터베이스 저장
-- **환경 변수**: 민감한 설정값은 환경 변수로 관리
-- **접근 제어**: Role 기반 API 접근 제어
 
 ### 리스크 관리 시스템
 
