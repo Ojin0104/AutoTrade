@@ -11,7 +11,6 @@
 - [핵심 기능](#핵심-기능)
 - [기술 스택](#기술-스택)
 - [설치 및 설정](#설치-및-설정)
-- [API 문서](#api-문서)
 - [사용법](#사용법)
 - [배치 스케줄](#배치-스케줄)
 - [보안 및 리스크 관리](#보안-및-리스크-관리)
@@ -129,7 +128,7 @@ BINANCE_API_KEY=your_binance_api_key
 BINANCE_SECRET_KEY=your_binance_secret_key
 
 # Exchange Rate API
-EXCHANGE_API_URL=https://ecos.bok.or.kr/api
+EXCHANGE_API_URL=https://oapi.koreaexim.go.kr
 EXCHANGE_API_KEY=your_exchange_api_key
 ```
 
@@ -191,7 +190,7 @@ GET /api/kimp/latest/KRW-BTC/BTCUSDT
 
 # 김프 히스토리 조회
 GET /api/kimp/history/KRW-BTC/BTCUSDT?startTime=2024-01-01T00:00:00&endTime=2024-01-02T00:00:00
-
+```
 
 #### 🪙 코인 페어 관리 API (`/api/coin-pairs`) - 공개 접근
 ```bash
