@@ -8,8 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import yj.AutoTrade.trade.entity.TradeCompensationQueue;
 import yj.AutoTrade.trade.entity.TradeCompensationStatus;
 import yj.AutoTrade.trade.repository.TradeCompensationQueueRepository;
-import yj.AutoTrade.upbit.UpbitException;
-import yj.AutoTrade.upbit.dto.UpbitOrderResponseDto;
+import yj.AutoTrade.api.upbit.UpbitException;
+import yj.AutoTrade.api.upbit.dto.UpbitOrderResponseDto;
 
 import java.time.LocalDateTime;
 

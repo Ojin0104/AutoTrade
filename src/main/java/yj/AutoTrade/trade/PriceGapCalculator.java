@@ -3,11 +3,13 @@ package yj.AutoTrade.trade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import yj.AutoTrade.binance.BinanceApiClient;
-import yj.AutoTrade.upbit.UpbitApiClient;
-import yj.AutoTrade.upbit.UpbitException;
-import yj.AutoTrade.upbit.dto.UpbitTickerResponseDto;
-import yj.AutoTrade.binance.dto.BinanceTickerPriceDto;
+import yj.AutoTrade.api.binance.BinanceApiClient;
+import yj.AutoTrade.api.upbit.UpbitApiClient;
+import yj.AutoTrade.api.upbit.dto.UpbitTickerResponseDto;
+import yj.AutoTrade.api.binance.dto.BinanceTickerPriceDto;
+import yj.AutoTrade.api.exchange.ExchangeRateService;
+import yj.AutoTrade.exception.TradeException;
+import yj.AutoTrade.exception.ErrorCode;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -18,22 +20,18 @@ import java.math.RoundingMode;
 public class PriceGapCalculator {
     private final UpbitApiClient upbitApiClient;
     private final BinanceApiClient binanceApiClient;
+    private final ExchangeRateService exchangeRateService;
 
     /**
-     * 실시간 USD/KRW 환율 조회 (업비트 USDT/KRW 가격 사용)
+     * 실시간 USD/KRW 환율 조회 (한국수출입은행 Open API 사용)
      * @return USD/KRW 환율
-     * @throws UpbitException 업비트 API 오류 시
      */
     private BigDecimal getCurrentExchangeRate() {
-        UpbitTickerResponseDto[] usdtTickers = upbitApiClient.getUpbitTicker("KRW-USDT");
-        if (usdtTickers == null || usdtTickers.length == 0) {
-            throw new RuntimeException("업비트 USDT 가격 정보를 가져올 수 없습니다.");
-        }
-        
-        BigDecimal usdtPrice = new BigDecimal(usdtTickers[0].getTradePrice());
-        log.debug("실시간 USD/KRW 환율: {}", usdtPrice);
-        return usdtPrice;
+        BigDecimal exchangeRate = exchangeRateService.getCurrentUsdKrwRate();
+        log.debug("실시간 USD/KRW 환율 (한국수출입은행): {}", exchangeRate);
+        return exchangeRate;
     }
+
 
     /**
      * 김치프리미엄 계산
@@ -51,17 +49,11 @@ public class PriceGapCalculator {
 
             // 2. 업비트 가격 조회 (KRW)
             UpbitTickerResponseDto[] upbitTickers = upbitApiClient.getUpbitTicker(upbitSymbol);
-            if (upbitTickers == null || upbitTickers.length == 0) {
-                throw new RuntimeException("업비트 가격 정보를 가져올 수 없습니다: " + upbitSymbol);
-            }
             BigDecimal upbitPrice = new BigDecimal(upbitTickers[0].getTradePrice());
             log.debug("업비트 가격: {} KRW", upbitPrice);
 
             // 3. 바이낸스 가격 조회 (USDT)
             BinanceTickerPriceDto binanceTicker = binanceApiClient.getTickerPrice(binanceSymbol);
-            if (binanceTicker == null) {
-                throw new RuntimeException("바이낸스 가격 정보를 가져올 수 없습니다: " + binanceSymbol);
-            }
             BigDecimal binancePrice = new BigDecimal(binanceTicker.getPrice());
             log.debug("바이낸스 가격: {} USDT", binancePrice);
 
@@ -80,14 +72,11 @@ public class PriceGapCalculator {
 
             return premium;
 
-        } catch (UpbitException e) {
-            log.error("업비트 API 오류로 김치프리미엄 계산 실패 - Upbit: {}, Binance: {}, 오류: {} - {}", 
-                    upbitSymbol, binanceSymbol, e.getErrorCode(), e.getErrorMessage());
-            throw e;
         } catch (Exception e) {
             log.error("김치프리미엄 계산 중 오류 발생 - Upbit: {}, Binance: {}, 오류: {}", 
                     upbitSymbol, binanceSymbol, e.getMessage(), e);
-            throw new RuntimeException("김치프리미엄 계산 실패", e);
+
+            throw new TradeException(ErrorCode.KIMP_CALCULATION_ERROR, e);
         }
     }
 
