@@ -16,15 +16,15 @@ import java.util.List;
 public class ExchangeRateApiClient {
 
     private final WebClient webClient;
+    private final String apiUrl;
+    private final String apiKey;
 
-    @Value("${exchange.api.key}")
-    private String apiKey;
-
-    public ExchangeRateApiClient(
-            @Value("${exchange.api.url}") String apiUrl,
-            WebClient.Builder webClientBuilder
-    ) {
-        this.webClient = webClientBuilder.baseUrl(apiUrl).build();
+    public ExchangeRateApiClient(WebClient.Builder webClientBuilder,
+                                @Value("${exchange.api.url}") String apiUrl,
+                                @Value("${exchange.api.key}") String apiKey) {
+        this.webClient = webClientBuilder.build();
+        this.apiUrl = apiUrl;
+        this.apiKey = apiKey;
     }
 
     /**
@@ -40,13 +40,13 @@ public class ExchangeRateApiClient {
             try {
                 String dateStr = searchDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
                 
-                String uriPath = String.format("/site/program/financial/exchangeJSON?authkey=%s&searchdate=%s&data=AP01", 
-                        apiKey, dateStr);
+                String fullUrl = String.format("%s/site/program/financial/exchangeJSON?authkey=%s&searchdate=%s&data=AP01", 
+                        apiUrl, apiKey, dateStr);
 
-                log.debug("한국수출입은행 환율 API 호출: {} (날짜: {})", uriPath, dateStr);
+                log.debug("한국수출입은행 환율 API 호출: {} (날짜: {})", fullUrl, dateStr);
                 
                 KoreaEximExchangeRateDto[] responseArray = webClient.get()
-                        .uri(uriPath)
+                        .uri(fullUrl)
                         .retrieve()
                         .bodyToMono(KoreaEximExchangeRateDto[].class)
                         .block();
