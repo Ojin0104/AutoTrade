@@ -25,7 +25,7 @@ public class KimpCollectionScheduler {
     }
 
     // 테스트용 수동 실행 (1분마다)
-    // @Scheduled(cron = "0 */1 * * * ?")
+    @Scheduled(cron = "0 */1 * * * ?")
     public void collectKimpDataForTest() {
         try {
             log.info("=== 테스트용 김프 데이터 수집 시작 ===");

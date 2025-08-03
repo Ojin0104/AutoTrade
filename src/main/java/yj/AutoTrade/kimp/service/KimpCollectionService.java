@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import yj.AutoTrade.api.binance.BinanceApiClient;
 import yj.AutoTrade.api.binance.dto.BinanceTickerPriceDto;
+import yj.AutoTrade.api.exchange.ExchangeRateService;
 import yj.AutoTrade.kimp.entity.CollectionStatus;
 import yj.AutoTrade.kimp.entity.CoinPair;
 import yj.AutoTrade.kimp.entity.KimpHistory;
@@ -29,6 +30,7 @@ public class KimpCollectionService {
     private final CoinPairRepository coinPairRepository;
     private final UpbitApiClient upbitApiClient;
     private final BinanceApiClient binanceApiClient;
+    private final ExchangeRateService exchangeRateService;
 
     public void collectAllKimpData() {
         log.info("김프 데이터 수집 시작");
@@ -62,8 +64,8 @@ public class KimpCollectionService {
         LocalDateTime collectedAt = LocalDateTime.now();
         
         try {
-            // 1. USDT-KRW 환율 조회
-            BigDecimal usdtKrwRate = getUsdtKrwRate();
+            // 1. USD-KRW 환율 조회 (한국은행 API)
+            BigDecimal usdKrwRate = getUsdKrwRate();
             
             // 2. 업비트 가격 조회
             UpbitTickerResponseDto[] upbitTickers = upbitApiClient.getUpbitTicker(pair.getUpbitSymbol());
@@ -85,8 +87,8 @@ public class KimpCollectionService {
             // 4. 바이낸스 24시간 거래량 조회 (별도 API 필요시)
             BigDecimal binanceVolume = getBinanceVolume24h(pair.getBinanceSymbol());
             
-            // 5. 바이낸스 가격을 KRW로 변환
-            BigDecimal binancePriceKrw = binancePrice.multiply(usdtKrwRate);
+            // 5. 바이낸스 가격을 KRW로 변환 (USD 기준)
+            BigDecimal binancePriceKrw = binancePrice.multiply(usdKrwRate);
             
             // 6. 김프 계산: ((업비트가격 - 바이낸스가격KRW) / 바이낸스가격KRW) * 100
             BigDecimal priceDifference = upbitPrice.subtract(binancePriceKrw);
@@ -100,7 +102,7 @@ public class KimpCollectionService {
                     .upbitPrice(upbitPrice)
                     .binancePrice(binancePrice)
                     .binancePriceKrw(binancePriceKrw)
-                    .usdtKrwRate(usdtKrwRate)
+                    .usdtKrwRate(usdKrwRate)
                     .kimpRate(kimpRate)
                     .priceDifference(priceDifference)
                     .upbitVolume24h(upbitVolume)
@@ -115,16 +117,15 @@ public class KimpCollectionService {
         }
     }
 
-    private BigDecimal getUsdtKrwRate() {
+    private BigDecimal getUsdKrwRate() {
         try {
-            UpbitTickerResponseDto[] usdtTickers = upbitApiClient.getUpbitTicker("KRW-USDT");
-            if (usdtTickers == null || usdtTickers.length == 0) {
-                throw new RuntimeException("USDT-KRW 환율 조회 실패");
-            }
-            return new BigDecimal(usdtTickers[0].getTradePrice());
+            log.debug("한국은행 USD-KRW 환율 조회 시작");
+            BigDecimal exchangeRate = exchangeRateService.getCurrentUsdKrwRate();
+            log.debug("한국은행 USD-KRW 환율 조회 성공: {}", exchangeRate);
+            return exchangeRate;
         } catch (Exception e) {
-            log.error("USDT-KRW 환율 조회 실패: {}", e.getMessage());
-            throw new RuntimeException("USDT-KRW 환율 조회 실패", e);
+            log.error("USD-KRW 환율 조회 실패: {}", e.getMessage());
+            throw new RuntimeException("USD-KRW 환율 조회 실패", e);
         }
     }
 
