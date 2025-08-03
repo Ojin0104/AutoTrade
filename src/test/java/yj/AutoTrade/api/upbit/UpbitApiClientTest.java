@@ -1,4 +1,4 @@
-package yj.AutoTrade.upbit;
+package yj.AutoTrade.api.upbit;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package yj.AutoTrade.binance;
+package yj.AutoTrade.api.binance;
 
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.beans.factory.annotation.Autowired;
