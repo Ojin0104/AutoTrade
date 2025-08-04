@@ -92,17 +92,7 @@ AutoTrade는 **업비트와 바이낸스 간의 김치프리미엄을 활용한 
 - **MySQL 8.0** 이상
 - **Gradle 7.x** 이상
 
-### 2. 데이터베이스 설정
-
-```sql
--- MySQL 데이터베이스 생성
-CREATE DATABASE autotrade;
-CREATE USER 'autotrade_user'@'localhost' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON autotrade.* TO 'autotrade_user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-### 3. 환경 변수 설정
+### 2. 환경 변수 설정
 
 프로젝트 루트에 `.env` 파일을 생성합니다:
 
@@ -132,7 +122,7 @@ EXCHANGE_API_URL=https://oapi.koreaexim.go.kr
 EXCHANGE_API_KEY=your_exchange_api_key
 ```
 
-### 4. 애플리케이션 실행
+### 3. 애플리케이션 실행
 
 ```bash
 # 환경 변수와 함께 실행
@@ -143,7 +133,7 @@ export $(cat .env | xargs) && ./gradlew bootRun
 export $(cat .env | xargs) && java -jar build/libs/AutoTrade-0.0.1-SNAPSHOT.jar
 ```
 
-### 5. 초기 데이터 설정
+### 4. 초기 데이터 설정
 
 애플리케이션 실행 후 다음 코인 페어들을 추가하세요:
 
