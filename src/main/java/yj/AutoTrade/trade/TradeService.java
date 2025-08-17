@@ -42,6 +42,7 @@ public class TradeService {
     private final TradeCompensationQueueService tradeCompensationQueueService;
     private final ExchangeRateApiClient exchangeRateApiClient;
     
+    @Qualifier("tradeExecutor")
     private final Executor tradeExecutor;
 
     public void trade(TradeRequestDto tradeRequestDto) {
